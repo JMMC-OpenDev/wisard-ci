@@ -1,7 +1,15 @@
 pro wisardgui,input,output,target=target,batch=batch,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,display=display
 
-forward_function WISARD_OIFITS2DATA,WISARD ; GDL does need that, IDL insists on it!
-
+  forward_function WISARD_OIFITS2DATA,WISARD ; GDL does need that, IDL insists on it!
+  
+  dotarget=n_elements(target) ne 0
+  dothreshold=n_elements(threshold) ne 0
+  doguess=n_elements(guess) ne 0
+  donbiter=n_elements(nbiter) ne 0
+  dofov=n_elements(fov) ne 0
+  donp_min=n_elements(np_min) ne 0
+  doregul=n_elements(regul) ne 0
+  
   if (~strmatch(!PATH,'*wisardlib*')) then begin
      b=routine_info('WISARDGUI',/source)
      c=file_dirname(b.path)
@@ -12,19 +20,21 @@ forward_function WISARD_OIFITS2DATA,WISARD ; GDL does need that, IDL insists on 
 
 
 ;; define constants
+  regul_name=['TOTVAR','PSD','L1L2','L1L2WHITE','SOFT_SUPPORT']
   defsysv, '!DI', dcomplex(0, 1), 1 ;Define i; i^2=-1 as readonly system-variable
   onemas=1d-3*(!DPi/180D)/3600D ; 1 mas in radian
+  
+;; defaults in absence of passed values. Normally these should be read
+;; in one of the headers.
+  if ~dotarget    then target="*"
+  if ~dothreshold then threshold=1d-6      ; convergence threshold
+  if ~doguess     then guess=0             ; default : non guess image
+  if ~donbiter    then nbiter=50           ; number of iterations.
+  if ~dofov       then fov=14.0D              ; Field of View of reconstructed image (14*14 marcsec^2 here)
+  if ~donp_min    then np_min=32           ; width of reconstructed image in pixels (same along x and y axis).
+  if ~doregul     then regul=0D             ; gilles code: 0:totvar, 1:psd, 2:l1l2, 3:l1l2_white, 4:support 
 
-;; passed values
-  if (n_elements(threshold) eq 0) then threshold=1d-6                ;  convergence threshold
-  if (n_elements(guess) eq 0) then guess=0                       ; default : non guess image
-  if (n_elements(nbiter) eq 0) then nbiter=50                     ; number of iterations.
-  if (n_elements(fov) eq 0) then fov=14                        ; Field of View of reconstructed image (14*14 marcsec^2 here)
-  if (n_elements(np_min) eq 0) then np_min=32                     ;  width of reconstructed image in pixels (same along x and y axis).
-  if (n_elements(regul) eq 0) then regul=0 ; gilles code: 0:totvar, 1:psd, 2:l1l2, 3:l1l2_white, 4:support 
-  if (n_elements(display) gt 0) then device, decomposed=0, retain=2
-
-  if (n_elements(target) lt 1) then target="*"
+  if n_elements(display) gt 0 then device, decomposed=0, retain=2
 
   wave_min = -1
   wave_max = -1
@@ -45,13 +55,27 @@ for i=1,next do begin
 ; where TFIELDS=0. use fits_read with only headers
       fits_read,input,dummy,inputparamsheader,/header_only,exten_no=i
 ; parse relevant parameters
-      target=strtrim(sxpar(inputparamsheader,"TARGET"),2) ; avoid problems with blanks.
+      req_target=strtrim(sxpar(inputparamsheader,"TARGET"),2) ; avoid problems with blanks.
+      if ~dotarget and req_target ne '0' then target=req_target
+      req_nbiter=sxpar(inputparamsheader,"MAXITER")
+      if ~donbiter and req_nbiter gt 0 then nbiter=req_nbiter
+;      req_rgl_name=strtrim(sxpar(inputparamsheader,"RGL_NAME"),2) ; avoid problems with blanks.
+;      if ~doregul and req_rgl_name ne '0' then begin
+;         w=where(strtrim(req_rgl_name,2) eq regul_name, count)
+;         if count lt 1 then  message,"unrecognized regularisation name."
+;         regul=w[0] 
+;      end
+      req_fov=sxpar(inputparamsheader,"FOV") 
+      if ~dofov and req_fov gt 0 then fov=req_fov
+      req_threshold=sxpar(inputparamsheader,"THRESHOL") 
+      if ~dothreshold and req_threshold gt 0 then threshold=req_threshold
+      req_np_min=sxpar(inputparamsheader,"NP_MIN") 
+      if ~donp_min and req_np_min gt 0 then np_min=req_np_min
+
+;not used yet      rgl_prio=strtrim(sxpar(inputparamsheader,"RGL_PRIO"),2) ; avoid problems with blanks.
+      init_img=strtrim(sxpar(inputparamsheader,"INIT_IMG"),2) ; avoid problems with blanks.
       wave_min=sxpar(inputparamsheader,"WAVE_MIN")
       wave_max=sxpar(inputparamsheader,"WAVE_MAX")
-      init_img=strtrim(sxpar(inputparamsheader,"INIT_IMG"),2) ; avoid problems with blanks.
-      nbiter=sxpar(inputparamsheader,"MAXITER")
-      rgl_name=strtrim(sxpar(inputparamsheader,"RGL_NAME"),2) ; avoid problems with blanks.
-      rgl_prio=strtrim(sxpar(inputparamsheader,"RGL_PRIO"),2) ; avoid problems with blanks.
    endif else if ( extname[i] EQ "IMAGE-OI OUTPUT PARAM") then begin ; idem trick
 ; do nothing
    endif else if extname[i] eq "OI_T3" then begin
@@ -153,7 +177,6 @@ case regul of
    else: message,"regularization not supported, FIXME!"
 endcase
 ; prepare output HDU
-regul_name=['TOTVAR','PSD','L1L2','L1L2WHITE','SOFT_SUPPORT']
 FXADDPAR,outhead,'EXTNAME','IMAGE-OI INPUT PARAM'
 FXADDPAR,outhead,'TARGET',target
 FXADDPAR,outhead,'WAVE_MIN',wave_min
@@ -167,13 +190,32 @@ FXADDPAR,outhead,'RGL_NAME',regul_name[regul]
 if (n_elements(scale) gt 0 ) then FXADDPAR,outhead,'SCALE',scale
 if (n_elements(delta) gt 0 ) then FXADDPAR,outhead,'DELTA',delta
 FXADDPAR,outhead,'THRESHOL',threshold
+FXADDPAR,outhead,'NP_MIN',np_min
+;FXADDPAR,outhead,'OVERSAMP',oversampling
 FXADDPAR,outhead,'FOV',fov,'Field of View (mas)'
-;
+
+; add correct values to image header
+sz=size(aux_output.x)
+nx=sz[1]
+ny=sz[2]
 FXADDPAR,imagehead,'EXTNAME','WISARD_IMAGE'
-;
-; write output file: 
-mwrfits,toto,output,header0,/create,/silent,/no_copy,/no_comment
-mwrfits,[0],output,outhead,/silent,/no_copy,/no_comment
+FXADDPAR,imagehead,'CTYPE1','RA---SIN'
+FXADDPAR,imagehead,'CTYPE2','DEC--SIN'
+FXADDPAR,imagehead,'CDELT1',fov/1000D/nx
+FXADDPAR,imagehead,'CDELT2',fov/1000D/ny
+FXADDPAR,imagehead,'CUNIT1','arcsec'
+FXADDPAR,imagehead,'CUNIT2','arcsec'
+;test
+FXADDPAR,header0,'CTYPE1','RA---SIN'
+FXADDPAR,header0,'CTYPE2','DEC--SIN'
+FXADDPAR,header0,'CDELT1',fov/1000D/nx
+FXADDPAR,header0,'CDELT2',fov/1000D/ny
+FXADDPAR,header0,'CUNIT1','arcsec'
+FXADDPAR,header0,'CUNIT2','arcsec'
+
+; write output file. Put output image in main header!
+mwrfits,aux_output.x,output,header0,/create,/silent,/no_copy,/no_comment
+mwrfits,!NULL,output,outhead,/silent,/no_copy,/no_comment
 mwrfits,aux_output.x,output,imagehead,/silent,/no_copy,/no_comment
 
 mwrfits,oitarget,output,targethead,/silent,/no_copy,/no_comment
@@ -190,5 +232,6 @@ for i=0,n_elements(oit3arr)-1 do begin
    col_of_flag=where(strtrim(tag_names(*oit3arr[i]),2) eq "FLAG", count)
    mwrfits,add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, use_target=target_id ), output, *oit3headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
 end
+exit
 if (n_elements(batch)) then exit
 end
