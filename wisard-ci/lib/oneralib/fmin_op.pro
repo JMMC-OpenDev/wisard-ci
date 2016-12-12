@@ -502,15 +502,16 @@ REPEAT BEGIN
                   nbr2str(fx_op, format = '(G25.15)'), '; conv=', errf_op
        iter_op += 1L               ; on incremente le compteur d'iter.
     ENDIF
-    
-    IF keyword_set(alltheway) AND (getenv('DISPLAY') NE '') THEN BEGIN
-;get_kbrd doit avoir un terminal (tty) en input
-        IF (strupcase(get_kbrd(0)) EQ 'Q') THEN BEGIN ;interruption propre des itérations
-            continue = 0B
-            message, 'interruption des iterations.', /INFO
-            interrupt_keyboard = 1B 
-        ENDIF
-    ENDIF  
+
+; not suitable for use with gui (no terminal, etc).   
+;    IF keyword_set(alltheway) AND (getenv('DISPLAY') NE '') THEN BEGIN
+;;get_kbrd doit avoir un terminal (tty) en input
+;        IF (strupcase(get_kbrd(0)) EQ 'Q') THEN BEGIN ;interruption propre des itérations
+;            continue = 0B
+;            message, 'interruption des iterations.', /INFO
+;            interrupt_keyboard = 1B 
+;        ENDIF
+;    ENDIF  
 
 ENDREP UNTIL ((job_op GE job_endvalue) OR (iter_op EQ itmax) OR $
               (NOT continue))
