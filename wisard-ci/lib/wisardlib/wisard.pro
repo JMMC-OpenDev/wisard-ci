@@ -789,12 +789,13 @@ FUNCTION WISARD, data,  $
      if keyword_set(print_times) then print,'Time t8',SYSTIME(/SECONDS )-t
      
      iter = iter+1L
-     IF (getenv('DISPLAY') NE '') THEN BEGIN 
-        IF (strupcase(get_kbrd(0) EQ 'Q')) THEN BEGIN   ; Q: clean interruption of iterations
-           continue = 0B
-           message, 'interruption of iterations by user.', /INFO
-        ENDIF
-     ENDIF
+; not suitable for use with gui (no terminal, etc).   
+;     IF (getenv('DISPLAY') NE '') THEN BEGIN 
+;        IF (strupcase(get_kbrd(0) EQ 'Q')) THEN BEGIN   ; Q: clean interruption of iterations
+;           continue = 0B
+;           message, 'interruption of iterations by user.', /INFO
+;        ENDIF
+;     ENDIF
      IF iter GT 2 THEN BEGIN
         conv = 2D*(old_crit-total(crit_array))/(old_crit+total(crit_array))
         print,nbr2str(iter, VERSION = version), '/', nbr2str(nbiter), '. Convergence=',  $
