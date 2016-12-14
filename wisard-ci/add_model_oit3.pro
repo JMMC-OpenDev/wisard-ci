@@ -66,17 +66,19 @@ function add_model_oit3,t3,wave,data,use_target=tid
   norm_x /= total(norm_x)
   achix2 = reform(H#norm_x) ;
 
-  H=WISARD_MAKE_H(FREQS_U=(freqs_u2-freqs_u1), FREQS_V=(freqs_v2-freqs_v1),$
+  H=WISARD_MAKE_H(FREQS_U=(freqs_u2+freqs_u1), FREQS_V=(freqs_v2+freqs_v1),$
                   FOV = data.fov, NP_MIN = data.np_min,$
                   NP_OUTPUT = NP, STEP_OUTPUT = step_output)
   norm_x = reform(congrid(data.x,np,np),np*np)
   norm_x /= total(norm_x)
   achix3 = reform(H#norm_x)
 
-  tripleproduct=achix1*achix3*conj(achix2)
+  tripleproduct=achix1*achix2*conj(achix3)
   if (all) then new_t3.ns_model_t3amp=reform(reform(abs(tripleproduct),nwave,ngoodtimes)) else new_t3.ns_model_t3amp[good]=reform(reform(abs(tripleproduct),nwave,ngoodtimes))
 
   if (all) then new_t3.ns_model_t3phi=reform(reform(atan(tripleproduct,/phase),nwave,ngoodtimes)) else new_t3.ns_model_t3phi[good]=reform(reform(atan(tripleproduct,/phase),nwave,ngoodtimes))
+  ;convert phases to degrees!
+  if (all) then new_t3.ns_model_t3phi*=180.0d/!DPI else new_t3.ns_model_t3phi[good]*=180.0d/!DPI
   return, new_t3
 
 
