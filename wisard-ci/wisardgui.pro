@@ -299,7 +299,7 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   end
   for i=0,n_elements(oit3arr)-1 do begin
      col_of_flag=where(strtrim(tag_names(*oit3arr[i]),2) eq "FLAG", count)
-     mwrfits,add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, use_target=target_id ), output, *oit3headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
+     mwrfits,add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, use_target=target_id ), output, *oit3headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1 ; note:t3phi must be in degrees, done in add_model_oit3
   end
   if (~n_elements(interactive)) then exit
 end
