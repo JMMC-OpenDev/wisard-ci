@@ -1,0 +1,71 @@
+#!/bin/bash
+#*******************************************************************************
+# JMMC project ( http://www.jmmc.fr ) - Copyright (C) CNRS.
+#*******************************************************************************
+
+#
+# WISARD COMMON INTERFACE wrapper
+#
+
+
+# HERE BEGINS THE SCRIPT
+
+#make FULLSCRIPTNAME and SCRIPTROOT fully qualified
+FULLSCRIPTNAME=$(readlink -f $0)
+SCRIPTNAME=$(basename $FULLSCRIPTNAME)
+SCRIPTROOT=$(readlink -f $( dirname $FULLSCRIPTNAME)/..)
+
+#source main environment if any
+if [ -e "$SCRIPTROOT/bin/env.sh" ]
+then
+  source $SCRIPTROOT/bin/env.sh
+fi
+
+# Print usage and exit program
+function printUsage ()
+{
+  echo -e "Usage: $SCRIPTNAME [-h] [-v] <input> <output>"
+  echo -e "\t-h\tprint this help."
+  echo -e "\t-v\tprint version. "
+  exit 1
+}
+
+# Print version and exit program
+function printVersion ()
+{
+  # WISARD_CI_VERSION is declared as env var in the DockerFile
+  echo $WISARD_CI_VERSION
+  exit 0
+}
+
+
+# Parse command-line parameters
+while getopts "hv" option
+do
+    case $option in
+        h ) 
+            printUsage ;;
+        v ) 
+            printVersion ;;
+        * ) # Unknown option
+            echo "Invalid option -- $option"
+            printUsage ;;
+    esac
+done
+
+let SHIFTOPTIND=$OPTIND-1
+shift $SHIFTOPTIND
+
+if [ $# -lt 2 ]
+then
+    echo "ERROR: Missing arguments"
+    printUsage 
+fi
+INPUT="$(readlink -f $1)"
+OUTPUT="$(readlink -f $2)"
+
+# Run execution
+cd $SCRIPTROOT
+echo "DEBUG input=$INPUT"
+echo "DEBUG output=$OUTPUT"
+GDL_STARTUP="gdl_startup.pro" gdl -e "wisardgui,\"$INPUT\",\"$OUTPUT\""
