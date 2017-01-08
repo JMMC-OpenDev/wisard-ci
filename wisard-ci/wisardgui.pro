@@ -37,8 +37,9 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   if ~n_elements(interactive) then begin
      CATCH, error_status
      if (error_status ne 0) then begin
-        message,/reissue_last,/informational
-        exit
+        CATCH,/CANCEL
+        print,"error has occured, exiting."
+        exit, status=1
      end
   end
 ; after catch to handle this first error message if necessary. 
@@ -301,5 +302,5 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
      col_of_flag=where(strtrim(tag_names(*oit3arr[i]),2) eq "FLAG", count)
      mwrfits,add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, use_target=target_id ), output, *oit3headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1 ; note:t3phi must be in degrees, done in add_model_oit3
   end
-  if (~n_elements(interactive)) then exit
+  if (~n_elements(interactive)) then exit,status=0
 end
