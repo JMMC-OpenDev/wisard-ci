@@ -146,7 +146,11 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
         if (count gt 1) then print, 'multiple init images found in input file, discarding.'
         if (count ge 1) then guess=mrdfits(input,w[0],header) ; TODO: use header coordinates etc.
      endif 
-  endif else guess=init_img     ; a passed 2d array.
+  endif else begin
+                                ; if init_img is a string, read it as
+                                ; fits. Else check it is a 2d array
+     if ((size(init_img))[-2] eq 7) then guess=mrdfits(init_img,0,init_img_header) else guess=init_img ; a passed 2d array.
+  end
 
 ; if rgl_prio is defined in header, then find this hdu, read image and use it as guess
   if ~dorgl_prio then begin
@@ -173,6 +177,9 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
      raep0=oitarget[w[0]].raep0
      decep0=oitarget[w[0]].decep0
   endelse
+; warn (for the time being) that a complicated OIFITS is not pruned at
+; output by the choice of only one object: 
+if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output file will contain more HDUs than the selected target's ones."
 
 ; create table of correspondence: which wave correspond to vis2 and t3
   allinsnames=strarr(n_elements(oiwavearr))
@@ -187,16 +194,24 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
 ; all values defined, read data
   data=wisard_oifits2data(input,targetname=target)
 
+  doWaveSubset=0
 ; simple wavelength selection
   if (wave_min lt wave_max) then begin
-     w=where(data.wlen ge wave_min and data.wlen le wave_max, count)
+     doWaveSubset=1
+     waveSubset=where(data.wlen ge wave_min and data.wlen le wave_max, count)
      if count lt 1 then message,"no such wavelength range in data"
-     data = data[w]
+     data = data[waveSubset]
   end else begin                ; set values of wave_min and max to used values:
      wave_min = min(data.wlen)
      wave_max = max(data.wlen)
   end
-
+; update fov to be no greater than max fov given by telescope diameter
+; and lambad_min
+maxfov=(1.22*wave_min/(*oiarrayarr)[0].diameter)*180*3600.*1000./!DPI
+if (fov gt maxfov or fov le 0) then begin
+   print,'Setting FOV to (maximum) value of '+strtrim(string(maxfov, format='(F6.2)'),2)+'.'
+   fov=maxfov
+end 
 ; start reconstruction. TODO case wrt rgl_name/prior
   case regul of
      0: reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, AUX_OUTPUT = aux_output, /TOTVAR, oversampling=oversampling, positivity=positivity, display=display) 
@@ -232,15 +247,16 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
      
      else: message,"regularization not yet supported, FIXME!"
   endcase
+
 ; prepare output HDU
   FXADDPAR,outhead,'EXTNAME','IMAGE-OI INPUT PARAM'
   FXADDPAR,outhead,'TARGET',target
   FXADDPAR,outhead,'WAVE_MIN',wave_min
   FXADDPAR,outhead,'WAVE_MAX',wave_max
-  FXADDPAR,outhead,'USE_VIS',0L
-  FXADDPAR,outhead,'USE_VIS2',1L
-  FXADDPAR,outhead,'USE_T3',1L
-  FXADDPAR,outhead,'INIT_IMG','WISARD_IMAGE'
+  FXADDPAR,outhead,'USE_VIS', 'F'
+  FXADDPAR,outhead,'USE_VIS2','T'
+  FXADDPAR,outhead,'USE_T3', 'T'
+  FXADDPAR,outhead,'INIT_IMG',init_img ; the init image file passed
   FXADDPAR,outhead,'MAXITER',nbiter
   FXADDPAR,outhead,'RGL_NAME',regul_name[regul]
   if (n_elements(scale) gt 0 ) then FXADDPAR,outhead,'SCALE',scale
@@ -250,11 +266,12 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   FXADDPAR,outhead,'OVERSAMP',oversampling
   FXADDPAR,outhead,'FOV',fov,'Field of View (mas)'
 
-; add correct values to image header
-  sz=size(aux_output.x)
+; add correct values to images headers
+  sz=size(aux_output.guess)
   nx=sz[1]
   ny=sz[2]
-  FXADDPAR,imagehead,'EXTNAME','WISARD_IMAGE'
+  FXADDPAR,imagehead,'EXTNAME',init_img
+  FXADDPAR,imagehead,'HDUNAME',init_img
   FXADDPAR,imagehead,'CTYPE1','RA---SIN'
   FXADDPAR,imagehead,'CTYPE2','DEC--SIN'
   FXADDPAR,imagehead,'CRPIX1',nx/2
@@ -268,7 +285,11 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   FXADDPAR,imagehead,'CUNIT1','deg'
   FXADDPAR,imagehead,'CUNIT2','deg'
   FXADDPAR,imagehead,'EQUINOX',2000.0
-;test
+;main header: the reconstructed image
+  sz=size(aux_output.x)
+  nx=sz[1]
+  ny=sz[2]
+  FXADDPAR,main_header,'HDUNAME','wisard_image'
   FXADDPAR,main_header,'CTYPE1','RA---SIN'
   FXADDPAR,main_header,'CTYPE2','DEC--SIN'
   FXADDPAR,main_header,'CRPIX1',nx/2
@@ -286,7 +307,7 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
 ; write output file. Put output image in main header!
   mwrfits,aux_output.x,output,main_header,/create,/silent,/no_copy,/no_comment
   mwrfits,!NULL,output,outhead,/silent,/no_copy,/no_comment
-  mwrfits,aux_output.x,output,imagehead,/silent,/no_copy,/no_comment
+  mwrfits,aux_output.guess,output,imagehead,/silent,/no_copy,/no_comment
 
   mwrfits,oitarget,output,targethead,/silent,/no_copy,/no_comment
   for i=0,n_elements(oiarrayarr)-1 do mwrfits,*(oiarrayarr[i]),output,*(oiarrayheadarr[i]),/silent,/no_copy,/no_comment
@@ -294,6 +315,11 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   for i=0,n_elements(oiotherarr)-1 do mwrfits,*(oiotherarr[i]),output,*(oiotherheadarr[i]),/silent,/no_copy,/no_comment
 ; write structures updated with computed values: select only sections
 ; with target and pass corresponding wavelength.
+; TODO: if (doWaveSubset) write only the wavelength subset, not
+; everything. At least, for the moment, print a warning
+
+if (doWaveSubset) then message,/informational,'WARNING -- Writing ALL wavelengths in output file, not current wavelength subset.'
+
   for i=0,n_elements(oivis2arr)-1 do begin
      col_of_flag=where(strtrim(tag_names(*oivis2arr[i]),2) eq "FLAG", count)
      mwrfits,add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, use_target=target_id ), output, *oivis2headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
