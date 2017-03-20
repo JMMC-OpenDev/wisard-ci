@@ -1,4 +1,4 @@
-function add_model_oit3,t3,wave,data,use_target=tid
+function add_model_oit3,t3,wave,data,use_target=tid, wsubs=wsubs
 
   if (n_elements(tid) gt 0) then begin
      good=where(t3.target_id eq tid, count)
@@ -79,8 +79,41 @@ function add_model_oit3,t3,wave,data,use_target=tid
   if (all) then new_t3.ns_model_t3phi=reform(reform(atan(tripleproduct,/phase),nwave,ngoodtimes)) else new_t3.ns_model_t3phi[good]=reform(reform(atan(tripleproduct,/phase),nwave,ngoodtimes))
   ;convert phases to degrees!
   if (all) then new_t3.ns_model_t3phi*=180.0d/!DPI else new_t3.ns_model_t3phi[good]*=180.0d/!DPI
-  return, new_t3
 
+  if (n_elements(wsubs) eq 0) then return, new_t3
+; or: apply wavelength subset if necessary
 
+  wl=where(lambda ge wsubs[0] and lambda le wsubs[1], count)
+  if (count le 0) then begin 
+     message,/informational,"ERROR in wavelength subset values in function add_model_oivis2()."
+     exit,status=1
+  endif
+  lambda=lambda(wl)
+  nwave=count
+
+  ; must create a new table/structure
+  names=tag_names(new_t3)
+
+  ttag=where(names ne 'NS_MODEL_T3AMP' and names ne 'NS_MODEL_T3AMPERR' and names ne 'NS_MODEL_T3PHI' and names ne 'NS_MODEL_T3PHIERR' and names ne 'T3AMP' and names ne 'T3AMPERR' and names ne 'T3PHI' and names ne 'T3PHIERR' and names ne 'FLAG', count)
+  ; silly way to create all other columns in the struct:
+  t3subset=create_struct(names[ttag[0]],new_t3[0].(ttag[0]))
+  for itag=1,n_elements(ttag)-1 do t3subset=create_struct(t3subset,names[ttag[itag]],new_t3[0].(ttag[itag]))
+
+  ; now add wavelength subsets:
+  if (nwave gt 1) then t3addsubset=create_struct('NS_MODEL_T3AMP', fltarr(nwave), 'NS_MODEL_T3AMPERR', fltarr(nwave), 'NS_MODEL_T3PHI',  fltarr(nwave), 'NS_MODEL_T3PHIERR', fltarr(nwave), 'T3AMP',  dblarr(nwave), 'T3AMPERR', dblarr(nwave), 'T3PHI',  dblarr(nwave), 'T3PHIERR', dblarr(nwave), 'FLAG', bytarr(nwave)) else t3addsubset=create_struct('NS_MODEL_T3AMP', 0.0, 'NS_MODEL_T3AMPERR', 0.0, 'NS_MODEL_T3PHI',  0.0, 'NS_MODEL_T3PHIERR', 0.0, 'T3AMP',  0.0d, 'T3AMPERR', 0.0d, 'T3PHI',  0.0d, 'T3PHIERR', 0.0d,'FLAG',OB)
+   new_t3subset=replicate(create_struct(t3subset,t3addsubset),n_elements(new_t3))
+   ; populate new_t3subset for non-wavelength tags
+   for itag=0,n_elements(ttag)-1 do new_t3subset.(itag)=new_t3.(ttag[itag])
+   ; populate for wavelength subsets
+   new_t3subset.t3amp=new_t3.t3amp[wl]
+   new_t3subset.t3amperr=new_t3.t3amperr[wl]
+   new_t3subset.t3phi=new_t3.t3phi[wl]
+   new_t3subset.t3phierr=new_t3.t3phierr[wl]
+   new_t3subset.ns_model_t3amp=new_t3.ns_model_t3amp[wl]
+   new_t3subset.ns_model_t3amperr=new_t3.ns_model_t3amperr[wl]
+   new_t3subset.ns_model_t3phi=new_t3.ns_model_t3phi[wl]
+   new_t3subset.ns_model_t3phierr=new_t3.ns_model_t3phierr[wl]
+   new_t3subset.flag=new_t3.flag[wl]
+   return, new_t3subset
 end
 

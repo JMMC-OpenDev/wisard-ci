@@ -1,4 +1,4 @@
-function add_model_oivis2,vis2,wave,data,use_target=tid
+function add_model_oivis2,vis2,wave,data, use_target=tid, wsubs=wsubs
 
   if (n_elements(tid) gt 0) then begin
      good=where(vis2.target_id eq tid, count)
@@ -50,5 +50,34 @@ function add_model_oivis2,vis2,wave,data,use_target=tid
 
   achix = reform(H#norm_x) ;
   if (all) then new_vis2.ns_model_vis2=reform(reform(abs2(achix),nwave,ngoodtimes)) else new_vis2.ns_model_vis2[good]=reform(reform(abs2(achix),nwave,ngoodtimes))
-  return, new_vis2
+
+  if (n_elements(wsubs) eq 0) then return, new_vis2
+; or: apply wavelength subset if necessary
+
+  wl=where(lambda ge wsubs[0] and lambda le wsubs[1], count)
+  if (count le 0) then begin 
+     message,/informational,"ERROR in wavelength subset values in function add_model_oivis2()."
+     exit,status=1
+  endif
+  lambda=lambda(wl)
+  nwave=count
+  ; must create a new table/structure
+  names=tag_names(new_vis2)
+  ttag=where(names ne "VIS2DATA" and names ne "VIS2ERR" and names ne "NS_MODEL_VIS2" and names ne "NS_MODEL_VIS2ERR" and names ne "FLAG", count)
+  ; silly way to create all other columns in the struct:
+  vis2subset=create_struct(names[ttag[0]],new_vis2[0].(ttag[0]))
+  for itag=1,n_elements(ttag)-1 do vis2subset=create_struct(vis2subset,names[ttag[itag]],new_vis2[0].(ttag[itag]))
+
+  ; now add wavelength subsets:
+  if (nwave gt 1) then vis2addsubset=create_struct('VIS2DATA', dblarr(nwave), 'VIS2ERR', dblarr(nwave), 'NS_MODEL_VIS2',fltarr(nwave),'NS_MODEL_VIS2ERR',fltarr(nwave), 'FLAG', bytarr(nwave)) else vis2addsubset=create_struct('VIS2DATA', 0.0d, 'VIS2ERR', 0.0d, 'NS_MODEL_VIS2',0.0,'NS_MODEL_VIS2ERR',0.0,'FLAG',OB)
+   new_vis2subset=replicate(create_struct(vis2subset,vis2addsubset),n_elements(new_vis2))
+   ; populate new_vis2subset for non-wavelength tags
+   for itag=0,n_elements(ttag)-1 do new_vis2subset.(itag)=new_vis2.(ttag[itag])
+   ; populate for wavelength subsets
+   new_vis2subset.vis2data=new_vis2.vis2data[wl]
+   new_vis2subset.vis2err=new_vis2.vis2err[wl]
+   new_vis2subset.ns_model_vis2=new_vis2.ns_model_vis2[wl]
+   new_vis2subset.ns_model_vis2err=new_vis2.ns_model_vis2err[wl]
+   new_vis2subset.flag=new_vis2.flag[wl]
+   return, new_vis2subset
 end

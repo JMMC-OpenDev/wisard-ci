@@ -1,4 +1,4 @@
-pro wisardgui,input,output,target=target,interactive=interactive,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm
+pro wisardgui,input,output,target=target,interactive=interactive,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange
 
   forward_function WISARD_OIFITS2DATA,WISARD ; GDL does not need that, IDL insists on it!
   
@@ -13,6 +13,7 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   doposit=n_elements(positivity) ne 0
   doinit_img=n_elements(init_img) ne 0
   dorgl_prio=n_elements(rgl_prio) ne 0
+  dowaverange=n_elements(waverange) ne 0
   
 ;; define constants
   regul_name=['TOTVAR','PSD','L1L2','L1L2WHITE','SOFT_SUPPORT']
@@ -53,7 +54,10 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
 
   wave_min = -1
   wave_max = -1
-
+  if (dowaverange) then begin
+     wave_min=waverange[0]*1D-6
+     wave_max=waverange[1]*1D-6
+  endif
 ;; read input file and get start image & parameters. If no parameters are present (bare oifits) use defaults.
 ;; FITS_INFO is robust in case of strange tables (no column table). 
   fits_info,input, n_ext=next, extname=extname, /silent
@@ -104,8 +108,8 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
         if ~doinit_img then init_img=strtrim(sxpar(inputparamsheader,"INIT_IMG"),2) ; avoid problems with blanks.
         if ~dorgl_prio then rgl_prio=strtrim(sxpar(inputparamsheader,"RGL_PRIO"),2) ; avoid problems with blanks.
 
-        wave_min=sxpar(inputparamsheader,"WAVE_MIN")
-        wave_max=sxpar(inputparamsheader,"WAVE_MAX")
+        if ~dowaverange then wave_min=sxpar(inputparamsheader,"WAVE_MIN")
+        if ~dowaverange then wave_max=sxpar(inputparamsheader,"WAVE_MAX")
      endif else if ( extname[i] EQ "IMAGE-OI OUTPUT PARAM") then begin ; idem trick
 ; do nothing
      endif else if extname[i] eq "OI_T3" then begin
@@ -195,16 +199,21 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
   data=wisard_oifits2data(input,targetname=target)
 
   doWaveSubset=0
-; simple wavelength selection
-  if (wave_min lt wave_max) then begin
-     doWaveSubset=1
-     waveSubset=where(data.wlen ge wave_min and data.wlen le wave_max, count)
-     if count lt 1 then message,"no such wavelength range in data"
-     data = data[waveSubset]
+; simple wavelength selection. If selection is >= min max range, no
+; subset is really asked for.
+  if (wave_min lt wave_max) then begin ; which have probaly been read in input file
+     w=where(data.wlen lt wave_min or data.wlen gt wave_max, count)
+     if count gt 0 then begin ; there is indeed a subset asked!
+        doWaveSubset=1
+        w=where(data.wlen ge wave_min and data.wlen le wave_max, count)
+        if count lt 1 then message,"no such wavelength range in data"
+        data = data[w]
+     endif
   end else begin                ; set values of wave_min and max to used values:
      wave_min = min(data.wlen)
      wave_max = max(data.wlen)
   end
+  waveSubset=[wave_min,wave_max]
 ; update fov to be no greater than max fov given by telescope diameter
 ; and lambad_min
 maxfov=(1.22*wave_min/(*oiarrayarr)[0].diameter)*180*3600.*1000./!DPI
@@ -315,18 +324,22 @@ end
   for i=0,n_elements(oiotherarr)-1 do mwrfits,*(oiotherarr[i]),output,*(oiotherheadarr[i]),/silent,/no_copy,/no_comment
 ; write structures updated with computed values: select only sections
 ; with target and pass corresponding wavelength.
-; TODO: if (doWaveSubset) write only the wavelength subset, not
-; everything. At least, for the moment, print a warning
-
-if (doWaveSubset) then message,/informational,'WARNING -- Writing ALL wavelengths in output file, not current wavelength subset.'
-
   for i=0,n_elements(oivis2arr)-1 do begin
      col_of_flag=where(strtrim(tag_names(*oivis2arr[i]),2) eq "FLAG", count)
-     mwrfits,add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, use_target=target_id ), output, *oivis2headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
-  end
+     if (doWaveSubset) then begin
+        vis2subset=add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, use_target=target_id , wsubs=waveSubset)
+        col_of_flag=where(strtrim(tag_names(vis2subset),2) eq "FLAG", count) ; redo since table order has probably changed
+        mwrfits,vis2subset, output,*oivis2headarr[i] ,/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
+     endif else mwrfits,add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, use_target=target_id), output, *oivis2headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
+  endfor
+
   for i=0,n_elements(oit3arr)-1 do begin
      col_of_flag=where(strtrim(tag_names(*oit3arr[i]),2) eq "FLAG", count)
-     mwrfits,add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, use_target=target_id ), output, *oit3headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1 ; note:t3phi must be in degrees, done in add_model_oit3
-  end
+     if (doWaveSubset) then begin
+        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, use_target=target_id, wsubs=waveSubset )
+        col_of_flag=where(strtrim(tag_names(t3subset),2) eq "FLAG", count) ; redo since table order has pprobably changed
+        mwrfits,t3subset, output, *oit3headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
+     endif else mwrfits,add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, use_target=target_id ), output, *oit3headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1 ; note:t3phi must be in degrees, done in add_model_oit3
+  endfor
   if (~n_elements(interactive)) then exit,status=0
 end
