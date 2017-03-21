@@ -62,10 +62,17 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
 ;; FITS_INFO is robust in case of strange tables (no column table). 
   fits_info,input, n_ext=next, extname=extname, /silent
   extname=strtrim(extname,2)
+;;create list of hdu numbers; and list of hdunames(if any) for further use:
+  hdunames=replicate('',next)
+  hdunumbers=indgen(next)
+
 ;read first header
   hdu0=mrdfits(input,0,main_header)
 ;if image, take it as guess (however can be updated afterwards, see below)
   if n_elements(hdu0) gt 1 then guess=hdu0
+; eventually, if has an HDUNAME, get it
+  hduname=strtrim(sxpar(main_header,"HDUNAME"),2)
+  if hduname ne '0' then hdunames[0]=hduname
 ;
 ;examine others
   for i=1,next do begin
@@ -134,8 +141,11 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
         oiwaveheadarr = (n_elements(oiwaveheadarr) gt 0)?[oiwaveheadarr,oiwavehead]:oiwavehead
      endif else if extname[i] eq  "OI_TARGET" then begin ; only one target.
         oitarget = mrdfits(input,i,targethead)
-     endif else begin           ; every other tables
+     endif else begin           ; every other tables: may contain an hduname image
         oiother = ptr_new( mrdfits(input,i,header) )
+        ; eventually, if has an HDUNAME, get it
+        hduname=strtrim(sxpar(header,"HDUNAME"),2)
+        if hduname ne '0' then hdunames[i]=hduname
         oiotherhead = ptr_new( header )
         oiotherarr = (n_elements(oiotherarr) gt 0)?[oiotherarr,oiother]:oiother
         oiotherheadarr = (n_elements(oiotherheadarr) gt 0)?[oiotherheadarr,oiotherhead]:oiotherhead
@@ -146,9 +156,9 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   if ~doinit_img then begin
      guess=0                    ; a good starting point...
      if n_elements(init_img) gt 0 then begin
-        w=where(extname eq init_img, count)
-        if (count gt 1) then print, 'multiple init images found in input file, discarding.'
-        if (count ge 1) then guess=mrdfits(input,w[0],header) ; TODO: use header coordinates etc.
+        w=where(hdunames eq init_img, count)
+        if (count gt 1) then print, 'multiple init images found in input file, discarding all but first one.'
+        if (count ge 1) then guess=mrdfits(input,hdunumbers[w[0]],header) ; TODO: use header coordinates etc.
      endif 
   endif else begin
                                 ; if init_img is a string, read it as
@@ -214,6 +224,7 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
      wave_max = max(data.wlen)
   end
   waveSubset=[wave_min,wave_max]
+
 ; update fov to be no greater than max fov given by telescope diameter
 ; and lambad_min
 maxfov=(1.22*wave_min/(*oiarrayarr)[0].diameter)*180*3600.*1000./!DPI
@@ -221,6 +232,7 @@ if (fov gt maxfov or fov le 0) then begin
    print,'Setting FOV to (maximum) value of '+strtrim(string(maxfov, format='(F6.2)'),2)+'.'
    fov=maxfov
 end 
+
 ; start reconstruction. TODO case wrt rgl_name/prior
   case regul of
      0: reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, AUX_OUTPUT = aux_output, /TOTVAR, oversampling=oversampling, positivity=positivity, display=display) 
@@ -256,7 +268,6 @@ end
      
      else: message,"regularization not yet supported, FIXME!"
   endcase
-
 ; prepare output HDU
   FXADDPAR,outhead,'EXTNAME','IMAGE-OI INPUT PARAM'
   FXADDPAR,outhead,'TARGET',target
@@ -319,27 +330,71 @@ end
   mwrfits,aux_output.guess,output,imagehead,/silent,/no_copy,/no_comment
 
   mwrfits,oitarget,output,targethead,/silent,/no_copy,/no_comment
+
+; a good program would only write results related to current target! TODO!
   for i=0,n_elements(oiarrayarr)-1 do mwrfits,*(oiarrayarr[i]),output,*(oiarrayheadarr[i]),/silent,/no_copy,/no_comment
-  for i=0,n_elements(oiwavearr)-1 do mwrfits,*(oiwavearr[i]),output,*(oiwaveheadarr[i]),/silent,/no_comment ; NO_COPY would invalidate the use of the table afterwards!
-  for i=0,n_elements(oiotherarr)-1 do mwrfits,*(oiotherarr[i]),output,*(oiotherheadarr[i]),/silent,/no_copy,/no_comment
+
+; do not write unknown arrays.
+;  for i=0,n_elements(oiotherarr)-1 do mwrfits,*(oiotherarr[i]),output,*(oiotherheadarr[i]),/silent,/no_copy,/no_comment
+
+  goodinsnamelist=''
 ; write structures updated with computed values: select only sections
-; with target and pass corresponding wavelength.
+; with target and pass corresponding wavelength for subset.
+; memorize corresponding insnames to write only the corresponding
+; wavelengths or wavelength subsets.
   for i=0,n_elements(oivis2arr)-1 do begin
-     col_of_flag=where(strtrim(tag_names(*oivis2arr[i]),2) eq "FLAG", count)
+     outhead=*oivis2headarr[i]
      if (doWaveSubset) then begin
-        vis2subset=add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, use_target=target_id , wsubs=waveSubset)
-        col_of_flag=where(strtrim(tag_names(vis2subset),2) eq "FLAG", count) ; redo since table order has probably changed
-        mwrfits,vis2subset, output,*oivis2headarr[i] ,/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
-     endif else mwrfits,add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, use_target=target_id), output, *oivis2headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
+        vis2subset=add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset)
+     endif else begin
+        vis2subset=add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id)
+     endelse
+     if ( n_elements(vis2subset) gt 0 ) then begin
+        ;add insname to 'good' insname list
+        insname=strtrim(sxpar(outhead,"INSNAME"),2)
+        goodinsnamelist=[goodinsnamelist,insname] ; add
+        goodinsnamelist = goodinsnamelist[UNIQ(goodinsnamelist, SORT(goodinsnamelist))] ; sort
+        col_of_flag=where(strtrim(tag_names(vis2subset),2) eq "FLAG", count) ; necessary for mwrfits.
+        mwrfits,vis2subset, output, outhead,/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
+     endif
+
   endfor
 
   for i=0,n_elements(oit3arr)-1 do begin
-     col_of_flag=where(strtrim(tag_names(*oit3arr[i]),2) eq "FLAG", count)
+     outhead=*oit3headarr[i]
      if (doWaveSubset) then begin
-        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, use_target=target_id, wsubs=waveSubset )
-        col_of_flag=where(strtrim(tag_names(t3subset),2) eq "FLAG", count) ; redo since table order has pprobably changed
-        mwrfits,t3subset, output, *oit3headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
-     endif else mwrfits,add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, use_target=target_id ), output, *oit3headarr[i],/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1 ; note:t3phi must be in degrees, done in add_model_oit3
+        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset )
+     endif else begin 
+        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id )
+     endelse
+    if ( n_elements(t3subset) gt 0 ) then begin ; no adding 'insname' as wisard uses both vis2 and t3. All relevant insnames have already been found.
+        col_of_flag=where(strtrim(tag_names(t3subset),2) eq "FLAG", count)
+        mwrfits,t3subset, output, outhead,/silent,/no_copy,/no_comment,logical_cols=col_of_flag+1
+     endif
   endfor
-  if (~n_elements(interactive)) then exit,status=0
+
+  for i=0,n_elements(oiwavearr)-1 do begin ; write only relevant instrument tables
+     insname=strtrim(sxpar(*(oiwaveheadarr[i]),"INSNAME"),2) ; avoid problems with blanks.
+     w=where(goodinsnamelist eq insname, count)
+     if (count gt 0) then begin
+        if (doWaveSubset) then begin                                           ; write only wavelength subset for specific insname
+           ww=where((*oiwavearr[i]).eff_wave ge waveSubset[0] and  (*oiwavearr[i]).eff_wave le waveSubset[1], count)
+           if (count gt 0) then mwrfits,(*oiwavearr[i])[ww],output,*(oiwaveheadarr[i]),/silent,/no_comment
+        endif else begin
+           mwrfits,*(oiwavearr[i]),output,*(oiwaveheadarr[i]),/silent,/no_comment ; NO_COPY would invalidate the use of the table afterwards!
+        endelse
+     endif
+  endfor
+
+
+
+  if (~n_elements(interactive)) then begin
+    print,'----------------ACKNOWLEDGEMENTS------------------------------'
+    print,"If WISARD was helpful for your research, please add this sentence in the acknowledgement section of your articles:"
+    print,"``This research has made use of the Jean-Marie Mariotti Center \textsc{WISARD} image reconstruction utility \footnote{Available at http://www.jmmc.fr/wisard}.''"
+    print,"and cite the two following refereed papers in the body of your paper:"
+    print,' (1) S. Meimon, L. M. Mugnier, and G. Le Besnerais, "Self-calibration approach for optical long-baseline interferometry imaging", J. Opt. Soc. Am. A, 26(1):108-120, 2009.'
+    print,' (2) S. Meimon, L. M. Mugnier and G. Le Besnerais,``A convex approximation of the likelihood in optical interferometry'', J. Opt. Soc. Am. A (November 2005).'
+     exit,status=0
+  endif
 end
