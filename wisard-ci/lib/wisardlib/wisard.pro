@@ -632,7 +632,7 @@ FUNCTION WISARD, data,  $
 ;;;;;;;;;;;;;
 ;; plot of V2 from data and from myopic convex estimate
      window, display+3, xs = 512, ys = 512, $
-             title = 'IDL '+nbr2str(display)+': original and myopic vis.'  
+             title = !PROMPT+nbr2str(display)+': original and myopic vis.'  
      wset, display+3
      RAD_FREQS = rad_freqs                                     ;
      ABS_VIS2 = reform(sqrt(abs(data.vis2)), n_elements(data.vis2)) ;
@@ -691,9 +691,9 @@ FUNCTION WISARD, data,  $
   conv = epsilon+1D
   IF (display NE 0) THEN BEGIN
      window, display, xs = 256, ys = 256, $
-             title = 'IDL '+nbr2str(display)+': reconstruction'
+             title = !PROMPT+nbr2str(display)+': reconstruction'
      window, display+1, $
-             title = 'IDL '+nbr2str(display+1)+': plot of visibility fit'
+             title = !PROMPT+nbr2str(display+1)+': plot of visibility fit'
   ENDIF
 
   if keyword_set(print_times) then print, '*** Starting loop'
