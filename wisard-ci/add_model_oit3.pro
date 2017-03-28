@@ -1,4 +1,4 @@
-function add_model_oit3,t3,wave,data,header, use_target=tid, wsubs=wsubs
+function add_model_oit3,t3,wave,aux_output,header, use_target=tid, wsubs=wsubs, operators=operators
 
 ; this functions adds the model-related columns to a OIVIS2 table,
 ; selecting only the target TOD and the wavelength subset wsubs. It
@@ -41,11 +41,13 @@ function add_model_oit3,t3,wave,data,header, use_target=tid, wsubs=wsubs
 ; compute model:
 ; replicate ucoord to nwave, replicate lambda to ntimes, flatten,
 ; divide for spatial freqs:
-  u1vector=transpose(cmreplicate(t3.u1coord,nwave))
-  u2vector=transpose(cmreplicate(t3.u2coord,nwave))
-  v1vector=transpose(cmreplicate(t3.v1coord,nwave))
-  v2vector=transpose(cmreplicate(t3.v2coord,nwave))
+  u1vector=transpose(cmreplicate(t3.u1coord,nwave)) ; u coordinate of baseline AB of the triangle (m)
+  u2vector=transpose(cmreplicate(t3.u2coord,nwave)) ; u coordinate of baseline BC of the triangle (m)
+  v1vector=transpose(cmreplicate(t3.v1coord,nwave)) ; v coordinate of baseline AB of the triangle (m)
+  v2vector=transpose(cmreplicate(t3.v2coord,nwave)) ; v coordinate of baseline BC of the triangle (m)
+
   lambdavector=cmreplicate(lambda,ntimes)
+
   freqs_u1=reform(u1vector/lambdavector,nwave*ntimes)
   freqs_v1=reform(v1vector/lambdavector,nwave*ntimes)
   freqs_u2=reform(u2vector/lambdavector,nwave*ntimes)
@@ -57,24 +59,28 @@ function add_model_oit3,t3,wave,data,header, use_target=tid, wsubs=wsubs
 ; np_min. congrid is needed. (but probably a bad idea!)
 ;  congrid does not preserve flux: renormalize!
 
+  np=(size(aux_output.x))[1]
+
   H=WISARD_MAKE_H(FREQS_U=freqs_u1, FREQS_V=freqs_v1,$
-                  FOV = data.fov, NP_MIN = data.np_min,$
-                  NP_OUTPUT = NP, STEP_OUTPUT = step_output)
-  norm_x = reform(congrid(data.x,np,np),np*np)
+                  FOV = aux_output.fov, NP_MIN = -np,$
+                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output)
+  norm_x = reform(aux_output.x,np*np)
   norm_x /= total(norm_x)
   achix1 = reform(H#norm_x) ;
 
   H=WISARD_MAKE_H(FREQS_U=freqs_u2, FREQS_V=freqs_v2,$
-                  FOV = data.fov, NP_MIN = data.np_min,$
-                  NP_OUTPUT = NP, STEP_OUTPUT = step_output)
-  norm_x = reform(congrid(data.x,np,np),np*np)
+                  FOV = aux_output.fov, NP_MIN = -np,$
+                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output)
+
+  norm_x = reform(aux_output.x,np*np)
   norm_x /= total(norm_x)
   achix2 = reform(H#norm_x) ;
 
-  H=WISARD_MAKE_H(FREQS_U=(freqs_u2+freqs_u1), FREQS_V=(freqs_v2+freqs_v1),$
-                  FOV = data.fov, NP_MIN = data.np_min,$
-                  NP_OUTPUT = NP, STEP_OUTPUT = step_output)
-  norm_x = reform(congrid(data.x,np,np),np*np)
+  H=WISARD_MAKE_H(FREQS_U=(freqs_u1+freqs_u2), FREQS_V=(freqs_v1+freqs_v2),$ ; baseline AC
+                  FOV = aux_output.fov, NP_MIN = -np,$
+                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output)
+
+  norm_x = reform(aux_output.x,np*np)
   norm_x /= total(norm_x)
   achix3 = reform(H#norm_x)
 

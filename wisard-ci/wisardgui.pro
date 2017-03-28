@@ -22,14 +22,14 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   
 ;; defaults in absence of passed values. Normally these should be read in one of the headers.
   if ~dotarget    then target="*"
-  if ~dothreshold then threshold=1d-6 ; convergence threshold
+  if ~dothreshold then threshold=1d-6 else threshold=double(threshold); convergence threshold
   if ~doguess     then guess=0        ; default : non guess image
-  if ~donbiter    then nbiter=50      ; number of iterations.
-  if ~dofov       then fov=14.0D      ; Field of View of reconstructed image (14*14 marcsec^2 here)
-  if ~donp_min    then np_min=32      ; width of reconstructed image in pixels (same along x and y axis).
-  if ~doregul     then regul=0D       ; gilles code: 0:totvar, 1:psd, 2:l1l2, 3:l1l2_white, 4:support 
-  if ~doovers     then oversampling=1 ; oversampling
-  if ~doposit     then positivity=1   ; quoted: "misplaced curiosity"
+  if ~donbiter    then nbiter=50      else nbiter=fix(nbiter) ; number of iterations.
+  if ~dofov       then fov=14.0D      else fov = double(fov) ; Field of View of reconstructed image (14*14 marcsec^2 here)
+  if ~donp_min    then np_min=32      else np_min = fix(np_min) ; width of reconstructed image in pixels (same along x and y axis).
+  if ~doregul     then regul=0D  else regul=fix(regul)     ; gilles code: 0:totvar, 1:psd, 2:l1l2, 3:l1l2_white, 4:support 
+  if ~doovers     then oversampling=1 else oversampling = fix (oversampling) ; oversampling
+  if ~doposit     then positivity=1   else positivity = fix (positivity) ; quoted: "misplaced curiosity"
 
   if n_elements(display) gt 0 then device, decomposed=0, retain=2
   if n_elements(display) gt 0 then interactive=1 
@@ -154,17 +154,20 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
 
 ; if init_img is defined in header, then find this hdu, read image and use it as guess
   if ~doinit_img then begin
-     guess=0                    ; a good starting point...
-     if n_elements(init_img) gt 0 then begin
+     if n_elements(guess) eq 0 and n_elements(init_img) gt 0 then begin
         w=where(hdunames eq init_img, count)
         if (count gt 1) then print, 'multiple init images found in input file, discarding all but first one.'
         if (count ge 1) then guess=mrdfits(input,hdunumbers[w[0]],header) ; TODO: use header coordinates etc.
-     endif 
+     endif
   endif else begin
                                 ; if init_img is a string, read it as
                                 ; fits. Else check it is a 2d array
      if ((size(init_img))[-2] eq 7) then guess=mrdfits(init_img,0,init_img_header) else guess=init_img ; a passed 2d array.
   end
+
+; if guess is a cube, take 1st plane
+if ((size(guess))[0] gt 2) then guess=guess[*,*,0,0,0,0,0]
+
 
 ; if rgl_prio is defined in header, then find this hdu, read image and use it as guess
   if ~dorgl_prio then begin
@@ -268,6 +271,7 @@ end
      
      else: message,"regularization not yet supported, FIXME!"
   endcase
+
 ; prepare output HDU
   FXADDPAR,outhead,'EXTNAME','IMAGE-OI INPUT PARAM'
   FXADDPAR,outhead,'TARGET',target
@@ -276,7 +280,7 @@ end
   FXADDPAR,outhead,'USE_VIS', 'F'
   FXADDPAR,outhead,'USE_VIS2','T'
   FXADDPAR,outhead,'USE_T3', 'T'
-  FXADDPAR,outhead,'INIT_IMG',init_img ; the init image file passed
+  if (isa(init_img)) then FXADDPAR,outhead,'INIT_IMG',init_img ; the init image file passed
   FXADDPAR,outhead,'MAXITER',nbiter
   FXADDPAR,outhead,'RGL_NAME',regul_name[regul]
   if (n_elements(scale) gt 0 ) then FXADDPAR,outhead,'SCALE',scale
@@ -290,8 +294,8 @@ end
   sz=size(aux_output.guess)
   nx=sz[1]
   ny=sz[2]
-  FXADDPAR,imagehead,'EXTNAME',init_img
-  FXADDPAR,imagehead,'HDUNAME',init_img
+  if (isa(init_img)) then FXADDPAR,imagehead,'EXTNAME',init_img else FXADDPAR,imagehead,'EXTNAME','wisard_initimage'
+  if (isa(init_img)) then FXADDPAR,imagehead,'HDUNAME',init_img else FXADDPAR,imagehead,'HDUNAME','wisard_initimage'
   FXADDPAR,imagehead,'CTYPE1','RA---SIN'
   FXADDPAR,imagehead,'CTYPE2','DEC--SIN'
   FXADDPAR,imagehead,'CRPIX1',nx/2
@@ -345,9 +349,9 @@ end
   for i=0,n_elements(oivis2arr)-1 do begin
      outhead=*oivis2headarr[i]
      if (doWaveSubset) then begin
-        vis2subset=add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset)
+        vis2subset=add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset, operators=aux_output.operators)
      endif else begin
-        vis2subset=add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id)
+        vis2subset=add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id, operators=aux_output.operators)
      endelse
      if ( n_elements(vis2subset) gt 0 ) then begin
         ;add insname to 'good' insname list
@@ -363,9 +367,9 @@ end
   for i=0,n_elements(oit3arr)-1 do begin
      outhead=*oit3headarr[i]
      if (doWaveSubset) then begin
-        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset )
+        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset, operators=aux_output.operators )
      endif else begin 
-        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id )
+        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id , operators=aux_output.operators)
      endelse
     if ( n_elements(t3subset) gt 0 ) then begin ; no adding 'insname' as wisard uses both vis2 and t3. All relevant insnames have already been found.
         col_of_flag=where(strtrim(tag_names(t3subset),2) eq "FLAG", count)

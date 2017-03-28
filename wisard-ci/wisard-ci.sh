@@ -7,11 +7,12 @@ function printUsage ()
     echo -e "          -i init_img : pass startup (guess) image (FITS format)"
     echo -e "          -f fov : field-of-view in mas"
     echo -e "          -n nbiter : number of iterations"
+    echo -e "          -r regularisation:  0:totvar, 1:psd, 2:l1l2, 3:l1l2_white, 4:support "
     exit 1
 }
 
 # Parse command-line parameters
-while getopts "hdf:i:n:" option
+while getopts "hdf:i:n:r:" option
 do
     case $option in
         h ) # Help option
@@ -29,6 +30,9 @@ do
         n ) # nbiter
             NBITER_COMMAND=', nbiter='\'"$OPTARG"\'' ';
 	    ;;
+        r ) # regul
+            REGUL_COMMAND=', regul='\'"$OPTARG"\'' ';
+	    ;;
         * ) # Unknown option
             echo "Invalid option -- $option"
             printUsage;
@@ -43,7 +47,7 @@ export IDL_DIR=/opt/idl/idl64
 export IDL_STARTUP=/home/gildas/amber/idl/idl_startup.pro
 
 cd $HOME/wisard-ci
-LIGNE="wisardgui,'"$1"','"$2"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}
+LIGNE="wisardgui,'"$1"','"$2"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}${REGUL_COMMAND}
 # /opt/idl/idl64/bin/idl -e $LIGNE
 #echo $LIGNE
  gdl -e "$LIGNE"

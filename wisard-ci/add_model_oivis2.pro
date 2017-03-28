@@ -1,4 +1,4 @@
-function add_model_oivis2,vis2,wave,data,header, use_target=tid, wsubs=wsubs
+function add_model_oivis2,vis2,wave,aux_output,header, use_target=tid, wsubs=wsubs, operators=operators
 
 ; this functions adds the model-related columns to a OIVIS2 table,
 ; selecting only the target TOD and the wavelength subset wsubs. It
@@ -39,21 +39,28 @@ function add_model_oivis2,vis2,wave,data,header, use_target=tid, wsubs=wsubs
 
   for itag=0,n_elements(ttag)-1 do new_vis2.(itag)=vis2.(ttag[itag]) ; populate temp_vis2's first columns of new_vis2.
 
+;;;; Computation of spatial frequencies
+;freqs_u = operators._B#aux_output.freqs_u
+;freqs_v = operators._B#aux_output.freqs_v
 ; compute model:
 ; replicate ucoord to nwave, replicate lambda to ntimes, flatten,
 ; divide for spatial freqs:
   uvector=transpose(cmreplicate(vis2.ucoord,nwave))
   vvector=transpose(cmreplicate(vis2.vcoord,nwave))
+
   lambdavector=cmreplicate(lambda,ntimes)
   freqs_u=reform(uvector/lambdavector,nwave*ntimes)
   freqs_v=reform(vvector/lambdavector,nwave*ntimes)
+
+  np=(size(aux_output.x))[1]
+
   H=WISARD_MAKE_H(FREQS_U=freqs_u, FREQS_V=freqs_v,$
-                  FOV = data.fov, NP_MIN = data.np_min,$
-                  NP_OUTPUT = NP, STEP_OUTPUT = step_output)
+                  FOV = aux_output.fov, NP_MIN = -np,$
+                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output)
 ; NP may not be np_min, although returned image (x) is only np_min x
 ; np_min. congrid is needed. (but probably a bad idea!)
 ;  congrid does not preserve flux: renormalize!
-  norm_x = reform(congrid(data.x,np,np),np*np)
+  norm_x = reform(aux_output.x,np*np)
   norm_x /= total(norm_x)
 
   achix = reform(H#norm_x) ;
