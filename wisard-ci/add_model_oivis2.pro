@@ -56,7 +56,7 @@ function add_model_oivis2,vis2,wave,aux_output,header, use_target=tid, wsubs=wsu
 
   H=WISARD_MAKE_H(FREQS_U=freqs_u, FREQS_V=freqs_v,$
                   FOV = aux_output.fov, NP_MIN = -np,$
-                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output)
+                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output, verb=0)
 ; NP may not be np_min, although returned image (x) is only np_min x
 ; np_min. congrid is needed. (but probably a bad idea!)
 ;  congrid does not preserve flux: renormalize!

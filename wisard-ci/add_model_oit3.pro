@@ -63,14 +63,14 @@ function add_model_oit3,t3,wave,aux_output,header, use_target=tid, wsubs=wsubs, 
 
   H=WISARD_MAKE_H(FREQS_U=freqs_u1, FREQS_V=freqs_v1,$
                   FOV = aux_output.fov, NP_MIN = -np,$
-                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output)
+                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output, verb=0)
   norm_x = reform(aux_output.x,np*np)
   norm_x /= total(norm_x)
   achix1 = reform(H#norm_x) ;
 
   H=WISARD_MAKE_H(FREQS_U=freqs_u2, FREQS_V=freqs_v2,$
                   FOV = aux_output.fov, NP_MIN = -np,$
-                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output)
+                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output, verb=0)
 
   norm_x = reform(aux_output.x,np*np)
   norm_x /= total(norm_x)
@@ -78,7 +78,7 @@ function add_model_oit3,t3,wave,aux_output,header, use_target=tid, wsubs=wsubs, 
 
   H=WISARD_MAKE_H(FREQS_U=(freqs_u1+freqs_u2), FREQS_V=(freqs_v1+freqs_v2),$ ; baseline AC
                   FOV = aux_output.fov, NP_MIN = -np,$
-                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output)
+                  NP_OUTPUT = NPOUT, STEP_OUTPUT = step_output, verb=0)
 
   norm_x = reform(aux_output.x,np*np)
   norm_x /= total(norm_x)
