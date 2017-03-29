@@ -281,7 +281,7 @@ end
   FXADDPAR,outhead,'USE_VIS', 'F'
   FXADDPAR,outhead,'USE_VIS2','T'
   FXADDPAR,outhead,'USE_T3', 'T'
-  if (isa(init_img)) then FXADDPAR,outhead,'INIT_IMG',init_img ; the init image file passed
+  if (n_elements(init_img) gt 0) then FXADDPAR,outhead,'INIT_IMG',init_img ; the init image file passed
   FXADDPAR,outhead,'MAXITER',nbiter
   FXADDPAR,outhead,'RGL_NAME',regul_name[regul]
   if (n_elements(scale) gt 0 ) then FXADDPAR,outhead,'SCALE',scale
@@ -295,8 +295,8 @@ end
   sz=size(aux_output.guess)
   nx=sz[1]
   ny=sz[2]
-  if (isa(init_img)) then FXADDPAR,imagehead,'EXTNAME',init_img else FXADDPAR,imagehead,'EXTNAME','wisard_initimage'
-  if (isa(init_img)) then FXADDPAR,imagehead,'HDUNAME',init_img else FXADDPAR,imagehead,'HDUNAME','wisard_initimage'
+  if (n_elements(init_img) gt 0) then FXADDPAR,imagehead,'EXTNAME',init_img else FXADDPAR,imagehead,'EXTNAME','wisard_initimage'
+  if (n_elements(init_img) gt 0) then FXADDPAR,imagehead,'HDUNAME',init_img else FXADDPAR,imagehead,'HDUNAME','wisard_initimage'
   FXADDPAR,imagehead,'CTYPE1','RA---SIN'
   FXADDPAR,imagehead,'CTYPE2','DEC--SIN'
   FXADDPAR,imagehead,'CRPIX1',nx/2
