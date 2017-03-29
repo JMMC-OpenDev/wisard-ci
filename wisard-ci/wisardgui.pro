@@ -162,7 +162,8 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   endif else begin
                                 ; if init_img is a string, read it as
                                 ; fits. Else check it is a 2d array
-     if ((size(init_img))[-2] eq 7) then guess=mrdfits(init_img,0,init_img_header) else guess=init_img ; a passed 2d array.
+     sz = size(init_img) & nsz = N_ELEMENTS(sz) & typesz = sz[nsz-2]  
+     if (typesz eq 7) then guess=mrdfits(init_img,0,init_img_header) else guess=init_img ; a passed 2d array.
   end
 
 ; if guess is a cube, take 1st plane
