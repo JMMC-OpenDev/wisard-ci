@@ -85,7 +85,7 @@ function add_model_oivis2,vis2,wave,aux_output,header, use_target=tid, wsubs=wsu
   wl=where(lambda ge wsubs[0] and lambda le wsubs[1], count)
   if (count le 0) then return,!NULL
   
-  lambda=lambda(wl)
+  lambda=lambda[wl]
   nwave=count
 
   ; must create a new table/structure since spectral dimension has changed:

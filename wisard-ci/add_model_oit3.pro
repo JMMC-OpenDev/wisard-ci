@@ -115,7 +115,7 @@ function add_model_oit3,t3,wave,aux_output,header, use_target=tid, wsubs=wsubs, 
   wl=where(lambda ge wsubs[0] and lambda le wsubs[1], count)
   if (count le 0) then return,!NULL
 
-  lambda=lambda(wl)
+  lambda=lambda[wl]
   nwave=count
 
   ; must create a new table/structure since spectral dimension has changed:
