@@ -229,7 +229,7 @@ ELSE BEGIN
        message, 'freqs must not contain the 0 frequency'
    fov_inside = 1D / min_abs_freqs
    IF (verbose) THEN BEGIN
-      printf, -2, 'FOV = 1/min(abs(freqs)) = ', $
+      print, 'FOV = 1/min(abs(freqs)) = ', $
               nbr2str(fov_inside, format = '(G25.7)'), ' = ', $
               nbr2str(fov_inside/unemas), ' mas (if freqs is in rd^{-1}).'
    ENDIF 
@@ -240,7 +240,7 @@ IF NOT keyword_set(oversampling) THEN oversampling = 1D
 step_nyquist = 1D / (2D * max_abs_freqs * oversampling) ; en radians
 np_nyquist   = ceil(fov_inside / step_nyquist)
 IF (verbose) THEN $
-    printf, -2, 'NP min for Nyquist criterion = ', nbr2str(np_nyquist), $
+    print, 'NP min for Nyquist criterion = ', nbr2str(np_nyquist), $
             '. STEP max for Nyquist criterion = ', nbr2str(step_nyquist, $
                                                            format = '(G25.7)')
 
@@ -264,7 +264,7 @@ IF keyword_set(step_input) THEN $
     step_output = double(step_input)
 
 IF (verbose) THEN $
-    printf, -2, 'NP is finally ', nbr2str(np_output), $
+    print, 'NP is finally ', nbr2str(np_output), $
             '. STEP is finally ', nbr2str(step_output, format = '(G25.7)')
 
 
