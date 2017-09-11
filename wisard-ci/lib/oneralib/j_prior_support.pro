@@ -95,7 +95,7 @@ np = sqrt(n_elements(x))
 IF keyword_set(mean_o) THEN $
     prior_inside = mean_o $
 ELSE BEGIN
-   dist = dist[np, cx = np/2D, cy = np/2D]*1D;*1./np
+   dist = dist(np, cx = np/2D, cy = np/2D)*1D;*1./np
    prior_inside = 1D / (1D + (2D*dist/fwhm)^2) ; Lorentzian shape by default
 ENDELSE
 
