@@ -96,7 +96,7 @@ function add_model_oivis2,vis2,wave,aux_output,header, use_target=tid, wsubs=wsu
   for itag=1,n_elements(ttag)-1 do vis2subset=create_struct(vis2subset,names[ttag[itag]],new_vis2[0].(ttag[itag]))
 
   ; now add wavelength subsets:
-  if (nwave gt 1) then vis2addsubset=create_struct('VIS2DATA', dblarr(nwave), 'VIS2ERR', dblarr(nwave), 'NS_MODEL_VIS2',fltarr(nwave), 'FLAG', bytarr(nwave)) else vis2addsubset=create_struct('VIS2DATA', 0.0d, 'VIS2ERR', 0.0d, 'NS_MODEL_VIS2',0.0,'FLAG',OB)
+  if (nwave gt 1) then vis2addsubset=create_struct('VIS2DATA', dblarr(nwave), 'VIS2ERR', dblarr(nwave), 'NS_MODEL_VIS2',fltarr(nwave), 'FLAG', bytarr(nwave)) else vis2addsubset=create_struct('VIS2DATA', 0.0d, 'VIS2ERR', 0.0d, 'NS_MODEL_VIS2',0.0,'FLAG',0B)
    new_vis2subset=replicate(create_struct(vis2subset,vis2addsubset),n_elements(new_vis2))
    ; populate new_vis2subset for non-wavelength tags
    for itag=0,n_elements(ttag)-1 do new_vis2subset.(itag)=new_vis2.(ttag[itag])
