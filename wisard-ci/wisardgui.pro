@@ -280,6 +280,7 @@ end
   endcase
 
 ; prepare output HDU
+  FXADDPAR,outhead,'XTENSION','BINTABLE'
   FXADDPAR,outhead,'EXTNAME','IMAGE-OI INPUT PARAM'
   FXADDPAR,outhead,'TARGET',target
   FXADDPAR,outhead,'WAVE_MIN',wave_min
@@ -337,7 +338,9 @@ end
 
 ; write output file. Put output image in main header!
   mwrfits,aux_output.x,output,main_header,/create,/silent,/no_copy,/no_comment
-  mwrfits,!NULL,output,outhead,/silent,/no_copy,/no_comment
+; create a dummy structure to make mwrfits write a binary extension
+  dummystruct={DUMMY: 0.0d}
+  mwrfits,dummystruct,output,outhead,/silent,/no_copy,/no_comment
   mwrfits,aux_output.guess,output,imagehead,/silent,/no_copy,/no_comment
 
   mwrfits,oitarget,output,targethead,/silent,/no_copy,/no_comment
