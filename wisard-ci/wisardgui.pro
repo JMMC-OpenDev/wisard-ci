@@ -1,4 +1,4 @@
-pro wisardgui,input,output,target=target,interactive=interactive,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange
+pro wisardgui,input,output,target=target,interactive=interactive,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim
 
   forward_function WISARD_OIFITS2DATA,WISARD ; GDL does not need that, IDL insists on it!
   
@@ -163,7 +163,13 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
                                 ; if init_img is a string, read it as
                                 ; fits. Else check it is a 2d array
      sz = size(init_img) & nsz = N_ELEMENTS(sz) & typesz = sz[nsz-2]  
-     if (typesz eq 7) then guess=mrdfits(init_img,0,init_img_header) else guess=init_img ; a passed 2d array.
+     if (typesz eq 7) then begin 
+        guess=mrdfits(init_img,0,init_img_header)
+        init_img=FILE_BASENAME(init_img) ; remove potentially harmful long dirname
+     endif else begin 
+        guess=init_img          ; a passed 2d array.
+        delvar,init_img         ; avoid further us of init_img as if it was a filename.
+     endelse
   end
 
 ; if guess is a cube, take 1st plane
@@ -249,25 +255,25 @@ end
            distance = double(shift(dist(np_min),np_min/2,np_min/2))
            psd = 1D/((distance^3 > 1D) < 1D6)
         endelse
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display)
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, simulated_data=issim)
      end
 
      2: begin
         scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         delta = 1D
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display)
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, simulated_data=issim)
      end
 
      3: begin
         scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         delta = 1D
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display)
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, simulated_data=issim)
      end
 
      4: begin
-        if ~n-elements(fwhm) then fwhm=10                  ; pixels
-        if ~n-elements(mu_support) then mu_support=10.0    ; why not?
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display)
+        if ~n_elements(fwhm) then fwhm=10                  ; pixels
+        if ~n_elements(mu_support) then mu_support=10.0    ; why not?
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, simulated_data=issim)
      end
      
      else: message,"regularization not yet supported, FIXME!"
