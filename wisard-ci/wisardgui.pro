@@ -218,6 +218,9 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
 ; all values defined, read data
   data=wisard_oifits2data(input,targetname=target)
 
+; there must be some data left to work with
+  if (~finite(total(data.vis2err)) || ~finite(total(data.cloterr))) then message,"Only Flagged Data Available, Aborting."
+
   doWaveSubset=0
 ; simple wavelength selection. If selection is >= min max range, no
 ; subset is really asked for.
