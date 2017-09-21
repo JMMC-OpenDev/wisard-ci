@@ -1,7 +1,11 @@
 pro wisardgui,input,output,target=target,interactive=interactive,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim
 
   forward_function WISARD_OIFITS2DATA,WISARD ; GDL does not need that, IDL insists on it!
-  
+
+  wisard_ci_version=getenv('WISARD_CI_VERSION')
+  if (strlen( wisard_ci_version) lt 1) then wisard_ci_version='Unversioned'
+  message,/informational,"Welcome to Wisard, version "+wisard_ci_version+", you have accepted the copyrights."
+
   dotarget=n_elements(target) ne 0
   dothreshold=n_elements(threshold) ne 0
   doguess=n_elements(guess) ne 0
@@ -26,8 +30,11 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   if ~doguess     then guess=0        ; default : non guess image
   if ~donbiter    then nbiter=50      else nbiter=fix(nbiter) ; number of iterations.
   if ~dofov       then fov=14.0D      else fov = double(fov) ; Field of View of reconstructed image (14*14 marcsec^2 here)
-  if ~donp_min    then np_min=32      else np_min = fix(np_min) ; width of reconstructed image in pixels (same along x and y axis).
-  if ~doregul     then regul=0D  else regul=fix(regul)     ; gilles code: 0:totvar, 1:psd, 2:l1l2, 3:l1l2_white, 4:support 
+  if ~donp_min    then np_min=32L      else np_min = fix(np_min) ; width of reconstructed image in pixels (same along x and y axis).
+  if ~doregul     then regul=0  else begin ; TOTVAR by default
+      w=where(strtrim(regul_name,2) eq regul, count) ; regul is a name here
+      if count lt 1 then regul=0 else regul=w[0]       ; regul is now an integer: 0:totvar, 1:psd, 2:l1l2, 3:l1l2_white, 4:support 
+  endelse
   if ~doovers     then oversampling=1 else oversampling = fix (oversampling) ; oversampling
   if ~doposit     then positivity=1   else positivity = fix (positivity) ; quoted: "misplaced curiosity"
 
@@ -61,6 +68,7 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
 ;; read input file and get start image & parameters. If no parameters are present (bare oifits) use defaults.
 ;; FITS_INFO is robust in case of strange tables (no column table). 
   fits_info,input, n_ext=next, extname=extname, /silent
+  if (next le 4) then message,"Input file is probably not an OIFITS file at all!"
   extname=strtrim(extname,2)
 ;;create list of hdu numbers; and list of hdunames(if any) for further use:
   hdunames=replicate('',next)
