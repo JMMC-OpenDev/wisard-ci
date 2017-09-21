@@ -88,21 +88,22 @@ then
     echo "ERROR: Missing arguments"
     printUsage 
 fi
+
 INPUT="$(readlink -f $1)"
 OUTPUT="$(readlink -f $2)"
-
-# Run execution
-cd $SCRIPTROOT
-#if env var is defined, we are remote on the JMMC server.
-  if [ -z "$WISARD_CI_VERSION" ]
-  then
-   INTERACTIVECOMMAND=', /interactive ';
-  fi
-
 echo "DEBUG input=$INPUT"
 echo "DEBUG output=$OUTPUT"
 
+# Run execution
+cd $SCRIPTROOT
+# If env var is defined, assume we are remote on the JMMC servers.
+if [ -z "$WISARD_CI_VERSION" ]
+then
+  INTERACTIVECOMMAND=', /interactive ';
+else 
+  # add helper to launch gdl properly
+  export GDL_STARTUP="gdl_startup.pro"
+fi
 
 WISARDCI_COMMAND="wisardgui,'"$INPUT"','"$OUTPUT"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}${REGUL_COMMAND}${INTERACTIVECOMMAND}
-#GDL_STARTUP="gdl_startup.pro" 
 gdl -e "$WISARDCI_COMMAND"
