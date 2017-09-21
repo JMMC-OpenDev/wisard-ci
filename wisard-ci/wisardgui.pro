@@ -1,3 +1,54 @@
+;
+;+
+;
+; NAME: WISARDGUI
+;
+; PURPOSE: 
+;     fronted of wisard interferometric image reconstruction
+;     procedure.
+;       
+; CATEGORY:
+;     Inverse Problems
+;
+; CALLING SEQUENCE: 
+;     WISARDGUI,INPUT,OUTPUT,
+;     TARGET=TARGET,INTERACTIVE=INTERACTIVE,THRESHOLD=THRESHOLD,
+;     GUESS=GUESS,NBITER=NBITER,FOV=FOV,NP_MIN=NP_MIN,REGUL=REGUL,
+;     POSITIVITY=POSITIVITY,OVERSAMPLING=OVERSAMPLING,
+;     INIT_IMG=INIT_IMG,RGL_PRIO=RGL_PRIO,DISPLAY=DISPLAY,
+;     MU_SUPPORT=MU_SUPPORT, FWHM=FWHM, WAVERANGE=WAVERANGE,
+;     SIMULATED_DATA=ISSIM 
+;
+; KEYWORD PARAMETERS:
+;    INPUT: input OIFITS or (better) OImaging OIFITS file (contains
+;    already guess image and parameters. Otherwise, use Keywords to enter
+;    these parameters
+;    OUTPUT: product  OImaging OIFITS file name.
+;
+;    TARGET: the object name (in case there are many in the input
+;    file)
+;    NBITER: max number of iterations (50 by default)
+;    NP_MIN: minimum number of resels to reconstruct. default computed
+;    internally 
+;    GUESS: Guess image (fits, seed doc for header parameters). Not mandatory.
+;    INIT_IMG: start with this image. Very useful for a start.
+;
+;    The other kw are best described in the documentation, see:
+;    WISARD:
+;    http://www.mariotti.fr/doc/approved/JMMC-MAN-2500-0001.pdf
+;    OImaging interface:
+;    http://www.mariotti.fr/doc/approved/JRA4Fp7Report2016.pdf
+;
+; LICENCE:
+; Copyright (C) 2017, G. Duvert unless explictly mentioned in files.
+;
+; This program is free software; you can redistribute it and/or modify  
+; it under the terms of the GNU General Public License as published by  
+; the Free Software Foundation; either version 2 of the License, or     
+; (at your option) any later version.                                   
+;
+;-
+
 pro wisardgui,input,output,target=target,interactive=interactive,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim
 
   forward_function WISARD_OIFITS2DATA,WISARD ; GDL does not need that, IDL insists on it!
