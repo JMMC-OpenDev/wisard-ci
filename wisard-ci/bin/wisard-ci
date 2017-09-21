@@ -34,7 +34,12 @@ function printUsage ()
 function printVersion ()
 {
   # WISARD_CI_VERSION is declared as env var in the DockerFile
-  echo $WISARD_CI_VERSION
+  if [ -z "$WISARD_CI_VERSION" ]
+  then
+    echo "WISARD_CI_VERSION undefined"
+  else
+    echo $WISARD_CI_VERSION
+  fi
   exit 0
 }
 
