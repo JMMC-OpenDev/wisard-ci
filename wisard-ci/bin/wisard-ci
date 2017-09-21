@@ -24,9 +24,16 @@ fi
 # Print usage and exit program
 function printUsage ()
 {
-  echo -e "Usage: $SCRIPTNAME [-h] [-v] <input> <output>"
+  echo -e "Usage: $SCRIPTNAME [-h] [-v] [-d] [-f fov] [-i init_img] <input> <output>"
   echo -e "\t-h\tprint this help."
   echo -e "\t-v\tprint version. "
+  echo -e ""
+  echo -e "The following options are available in manual mode only, not through the Oimaging interface:"
+  echo -e "\t-d : display graphs."
+  echo -e "\t-i init_img : pass startup (guess) image (FITS format)."
+  echo -e "\t-f fov : field-of-view in mas."
+  echo -e "\t-n nbiter : number of iterations."
+  echo -e "\t-r regularisation name : one of 'TOTVAR','PSD', 'L1L2', 'L1L2_WHITE', 'SOFT_SUPPORT' "
   exit 1
 }
 
@@ -45,13 +52,28 @@ function printVersion ()
 
 
 # Parse command-line parameters
-while getopts "hv" option
+while getopts "hvdf:i:n:r:" option
 do
     case $option in
         h ) 
             printUsage ;;
         v ) 
             printVersion ;;
+        f ) # fov
+            FOVCOMMAND=', fov='"$OPTARG"' ';
+	    ;;
+        d ) # display
+            DISPLAYCOMMAND=', /display ';
+	    ;;
+        i ) # init_image
+            INIT_IMAGE_COMMAND=', init_img='\'"$OPTARG"\'' ';
+	    ;;
+        n ) # nbiter
+            NBITER_COMMAND=', nbiter='\'"$OPTARG"\'' ';
+	    ;;
+        r ) # regul
+            REGUL_COMMAND=', regul='\'"$OPTARG"\'' ';
+	    ;;
         * ) # Unknown option
             echo "Invalid option -- $option"
             printUsage ;;
@@ -71,6 +93,16 @@ OUTPUT="$(readlink -f $2)"
 
 # Run execution
 cd $SCRIPTROOT
+#if env var is defined, we are remote on the JMMC server.
+  if [ -z "$WISARD_CI_VERSION" ]
+  then
+   INTERACTIVECOMMAND=', /interactive ';
+  fi
+
 echo "DEBUG input=$INPUT"
 echo "DEBUG output=$OUTPUT"
-GDL_STARTUP="gdl_startup.pro" gdl -e "wisardgui,\"$INPUT\",\"$OUTPUT\""
+
+
+WISARDCI_COMMAND="wisardgui,'"$INPUT"','"$OUTPUT"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}${REGUL_COMMAND}${INTERACTIVECOMMAND}
+#GDL_STARTUP="gdl_startup.pro" 
+gdl -e "$WISARDCI_COMMAND"
