@@ -48,7 +48,7 @@ export IDL_STARTUP=/home/gildas/amber/idl/idl_startup.pro
 
 cd $HOME/wisard-ci
 LIGNE="wisardgui,'"$1"','"$2"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}${REGUL_COMMAND}
-# /opt/idl/idl64/bin/idl -e $LIGNE
-#echo $LIGNE
+#source /opt/idl/idl84/bin/idl_setup.bash
+#/opt/idl/idl84/bin/idl -e "$LIGNE"
  gdl -e "$LIGNE"
 
