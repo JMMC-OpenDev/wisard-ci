@@ -29,10 +29,14 @@ function printUsage ()
   echo -e "\t-v\tprint version. "
   echo -e ""
   echo -e "The following options are available in manual mode only, not through the Oimaging interface:"
-  echo -e "\t-d : display graphs."
+  echo -e "\t-I : sets interactive mode (in particular do not exit at first error!) . Not to be used with OImaging."
+  echo -e "\t-d : display graphs (more than just interactive)."
+  echo -e "\t-A : use All data = ignore flagged data."
   echo -e "\t-i init_img : pass startup (guess) image (FITS format)."
   echo -e "\t-f fov : field-of-view in mas."
   echo -e "\t-n nbiter : number of iterations."
+  echo -e "\t-N np_min : number of reconstructed resels."
+  echo -e "\t-w [wmin,wmax] : wavelength range, in microns. No blanks in the argument, e.g.: [1.5,3.3] ."
   echo -e "\t-r regularisation name : one of 'TOTVAR','PSD', 'L1L2', 'L1L2_WHITE', 'SOFT_SUPPORT' "
   exit 1
 }
@@ -52,7 +56,7 @@ function printVersion ()
 
 
 # Parse command-line parameters
-while getopts "hvdf:i:n:r:" option
+while getopts "hvdIAf:i:n:r:N:w:" option
 do
     case $option in
         h ) 
@@ -62,17 +66,29 @@ do
         f ) # fov
             FOVCOMMAND=', fov='"$OPTARG"' ';
 	    ;;
-        d ) # display
+        d ) # display (forces interactive)
             DISPLAYCOMMAND=', /display ';
 	    ;;
         i ) # init_image
             INIT_IMAGE_COMMAND=', init_img='\'"$OPTARG"\'' ';
+	    ;;
+        I ) # interactive (no display)
+            INTERACTIVE_COMMAND=', /interactive ';
 	    ;;
         n ) # nbiter
             NBITER_COMMAND=', nbiter='\'"$OPTARG"\'' ';
 	    ;;
         r ) # regul
             REGUL_COMMAND=', regul='\'"$OPTARG"\'' ';
+	    ;;
+        N ) # np_min
+            NPMIN_COMMAND=', np_min='\'"$OPTARG"\'' ';
+	    ;;
+        w ) # waverange
+            WAVERANGE_COMMAND=', waverange='\'"$OPTARG"\'' ';
+	    ;;
+        A ) # all (flagged and not flagged) data
+            FLAG_COMMAND=', /use_flagged ';
 	    ;;
         * ) # Unknown option
             echo "Invalid option -- $option"
@@ -99,11 +115,16 @@ cd $SCRIPTROOT
 # If env var is defined, assume we are remote on the JMMC servers.
 if [ -z "$WISARD_CI_VERSION" ]
 then
-  INTERACTIVECOMMAND=', /interactive ';
-else 
-  # add helper to launch gdl properly
+  if [ -z "$IDL_STARTUP" ] #if we have no IDL env available....
+  then
+    export GDL_STARTUP="gdl_startup.pro"
+    echo "DEBUG using startup procedure $GDL_STARTUP"
+  else
+    echo "DEBUG using startup procedure $IDL_STARTUP"
+  fi
+else
+  # add helper to launch gdl properly. this procedure shoudl insure that the IDL/GDL !PATH contains idlastro procedures (readfits.pro etc).
   export GDL_STARTUP="gdl_startup.pro"
 fi
-
-WISARDCI_COMMAND="wisardgui,'"$INPUT"','"$OUTPUT"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}${REGUL_COMMAND}${INTERACTIVECOMMAND}
+WISARDCI_COMMAND="wisardgui,'"$INPUT"','"$OUTPUT"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}${INTERACTIVE_COMMAND}${WAVERANGE_COMMAND}${FLAG_COMMAND}${NPMIN_COMMAND}
 gdl -e "$WISARDCI_COMMAND"
