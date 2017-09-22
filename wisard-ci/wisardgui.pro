@@ -17,7 +17,7 @@
 ;     POSITIVITY=POSITIVITY,OVERSAMPLING=OVERSAMPLING,
 ;     INIT_IMG=INIT_IMG,RGL_PRIO=RGL_PRIO,DISPLAY=DISPLAY,
 ;     MU_SUPPORT=MU_SUPPORT, FWHM=FWHM, WAVERANGE=WAVERANGE,
-;     SIMULATED_DATA=ISSIM 
+;     SIMULATED_DATA=SIMULATED_DATA, USE_FLAGGED_DATA=USE_FLAGGED_DATA
 ;
 ; KEYWORD PARAMETERS:
 ;    INPUT: input OIFITS or (better) OImaging OIFITS file (contains
@@ -40,7 +40,7 @@
 ;    http://www.mariotti.fr/doc/approved/JRA4Fp7Report2016.pdf
 ;
 ; LICENCE:
-; Copyright (C) 2017, G. Duvert unless explictly mentioned in files.
+; Copyright (C) 2017, G. Duvert unless explicitly mentioned in files.
 ;
 ; This program is free software; you can redistribute it and/or modify  
 ; it under the terms of the GNU General Public License as published by  
@@ -49,7 +49,7 @@
 ;
 ;-
 
-pro wisardgui,input,output,target=target,interactive=interactive,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim
+pro wisardgui,input,output,target=target,interactive=interactive,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data
 
   forward_function WISARD_OIFITS2DATA,WISARD ; GDL does not need that, IDL insists on it!
 
@@ -97,10 +97,12 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
      CATCH, error_status
      if (error_status ne 0) then begin
         CATCH,/CANCEL
+        message,/reissue_last,/informational
         print,"error has occured, exiting."
         exit, status=1
      end
   end
+
 ; after catch to handle this first error message if necessary. 
   if (~strmatch(!PATH,'*wisardlib*')) then begin
      b=routine_info('WISARDGUI',/source)
@@ -307,7 +309,7 @@ end
 
 ; start reconstruction. TODO case wrt rgl_name/prior
   case regul of
-     0: reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, AUX_OUTPUT = aux_output, /TOTVAR, oversampling=oversampling, positivity=positivity, display=display) 
+     0: reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, AUX_OUTPUT = aux_output, /TOTVAR, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim) 
      
      1: begin
 ; if regul == 1 (psd) if no prior given, create the PSD of the documentation:
@@ -317,25 +319,25 @@ end
            distance = double(shift(dist(np_min),np_min/2,np_min/2))
            psd = 1D/((distance^3 > 1D) < 1D6)
         endelse
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, simulated_data=issim)
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim)
      end
 
      2: begin
         scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         delta = 1D
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, simulated_data=issim)
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim)
      end
 
      3: begin
         scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         delta = 1D
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, simulated_data=issim)
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim)
      end
 
      4: begin
         if ~n_elements(fwhm) then fwhm=10                  ; pixels
         if ~n_elements(mu_support) then mu_support=10.0    ; why not?
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, simulated_data=issim)
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim)
      end
      
      else: message,"regularization not yet supported, FIXME!"
