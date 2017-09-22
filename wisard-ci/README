@@ -12,7 +12,8 @@ Optical Imaging interface requirements
 to the OI-FITS format, and to the OImaging GUI available at
 http://www.mariotti.fr/oimaging.htm
 
-WISARD-CI is easily installed: 
+WISARD-CI installation: 
+------------------------------
 
 - get the SVN repository files
 - put bin/wisard-ci in the PATH:
@@ -21,24 +22,40 @@ WISARD-CI is easily installed:
   > ln -s /where/is/wisard-ci ~/bin
   (provided ~/bin exist and is in the PATH of course)
 
-Now the hard part:
-- install GDL, the free IDL clone, available as 'gnudatalanguage' in your ditribution (MacOS: "brew tap Homebrew/homebrew-science" and "brew install gnudatalanguage" for example; look for "gnudatalanguage" in debian, ubuntu etc.)
- --> eventually, get the source distribution on SF: https://sourceforge.net/projects/gnudatalanguage and follow compilation instructions.
+- if you have IDL, you are rich. And you do not have to follow the
+  instructions below. Go to "USAGE".
 
-note: Old versions of GDL (before 0.9.6) will be SLOW.
+- Now the hard part:
 
-then, type "wisard-ci" and read help.
+  - install GDL, the free IDL clone, available as 'gnudatalanguage' in
+  your ditribution (MacOS: "brew tap Homebrew/homebrew-science" and
+  "brew install gnudatalanguage" for example; look for
+  "gnudatalanguage" in debian, ubuntu etc.)
 
-At that moment, you can either use wisard-ci in command line, or tell the GUI that you have a local version of wisard-ci.
+  --> eventually, get the source distribution on SF:
+  https://sourceforge.net/projects/gnudatalanguage and follow
+  compilation instructions. Prefer recent versions. Old versions of
+  GDL (before 0.9.6) will be SLOW.
 
-You can also call GDL and at the prompt, use the procedure wisardgui.pro.
+USAGE:
+-------
+
+if installation is ok, type "wisard-ci" and read help.
+
+At that moment, you can either use wisard-ci in command line, or tell
+the GUI that you have a local version of wisard-ci.
+
+You can also call GDL (or IDL) and at the prompt, use the procedure wisardgui.pro.
 use 
 GDL> cd,"where/is/wisard-ci"; doc_library,"wisardgui" 
 to print the minimum information on wisardgui procedure.
 
-OR: You have IDL installed: It is the same as for GDL, but you must edit bin/wisard-ci to replace "gdl" by "idl" and probably add the necessary IDL environment.
+If you have IDL installed: It is the same as for GDL, but you must
+edit bin/wisard-ci to replace "gdl" by "idl" and possibly add the
+necessary IDL environment variables (not tested).
 
 To USE a LOCAL INSTALL of WISARD-CI in the OImaging Gui:
+--------------------------------------------------------
 
 This is possible, provided you update the !PATH value in
 wisard-ci/gdl_startup.pro : it is necessary to find the IDL procedures
