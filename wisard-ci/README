@@ -38,6 +38,15 @@ to print the minimum information on wisardgui procedure.
 
 OR: You have IDL installed: It is the same as for GDL, but you must edit bin/wisard-ci to replace "gdl" by "idl" and probably add the necessary IDL environment.
 
+To USE a LOCAL INSTALL of WISARD-CI in the OImaging Gui:
+
+This is possible, provided you update the !PATH value in
+wisard-ci/gdl_startup.pro : it is necessary to find the IDL procedures
+of idlastro distribution, available at https://idlastro.gsfc.nasa.gov/
+
+You start the local wisard-ci by selecting "WISARD" and not "WISARD (remote)" in the OImaging GUI.  
+
+
 WARNING!: 
 
 1) WISARD makes use of the astrolib (https://idlastro.gsfc.nasa.gov/)
