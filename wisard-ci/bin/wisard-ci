@@ -29,8 +29,7 @@ function printUsage ()
   echo -e "\t-v\tprint version. "
   echo -e ""
   echo -e "The following options are available in manual mode only, not through the Oimaging interface:"
-  echo -e "\t-I : sets interactive mode (in particular do not exit at first error!) . Not to be used with OImaging."
-  echo -e "\t-d : display graphs (more than just interactive)."
+  echo -e "\t-d : display graphs (needs interactive mode, defined as the existence of an attached Terminal to the process)."
   echo -e "\t-A : use All data = ignore flagged data."
   echo -e "\t-i init_img : pass startup (guess) image (FITS format)."
   echo -e "\t-f fov : field-of-view in mas."
@@ -56,7 +55,7 @@ function printVersion ()
 
 
 # Parse command-line parameters
-while getopts "hvdIAf:i:n:r:N:w:" option
+while getopts "hvdAf:i:n:r:N:w:" option
 do
     case $option in
         h ) 
@@ -66,14 +65,11 @@ do
         f ) # fov
             FOVCOMMAND=', fov='"$OPTARG"' ';
 	    ;;
-        d ) # display (forces interactive)
+        d ) # display 
             DISPLAYCOMMAND=', /display ';
 	    ;;
         i ) # init_image
             INIT_IMAGE_COMMAND=', init_img='\'"$OPTARG"\'' ';
-	    ;;
-        I ) # interactive (no display)
-            INTERACTIVE_COMMAND=', /interactive ';
 	    ;;
         n ) # nbiter
             NBITER_COMMAND=', nbiter='\'"$OPTARG"\'' ';
@@ -126,5 +122,5 @@ else
   # add helper to launch gdl properly. this procedure shoudl insure that the IDL/GDL !PATH contains idlastro procedures (readfits.pro etc).
   export GDL_STARTUP="gdl_startup.pro"
 fi
-WISARDCI_COMMAND="wisardgui,'"$INPUT"','"$OUTPUT"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}${INTERACTIVE_COMMAND}${WAVERANGE_COMMAND}${FLAG_COMMAND}${NPMIN_COMMAND}
+WISARDCI_COMMAND="wisardgui,'"$INPUT"','"$OUTPUT"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}${WAVERANGE_COMMAND}${FLAG_COMMAND}${NPMIN_COMMAND}
 gdl -e "$WISARDCI_COMMAND"
