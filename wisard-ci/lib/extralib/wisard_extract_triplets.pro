@@ -125,6 +125,10 @@ end
 
 function wisard_extract_triplets, oiarray, oitarget, oiwavelength, oivis, oivis2, oit3, targetname=targetname, verbose=verbose, explode_triplets=explode_triplets, SYNCHRONICITY=synchronicity
   ON_ERROR, 2
+
+@ "wisard_common.pro"
+@ "wisard_catch_noniteractive.pro" ; for interactive & catch facility.
+
 ; definitions of structures
 ; t3
 t3time_=0
