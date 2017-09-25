@@ -37,7 +37,7 @@ function printUsage ()
   echo -e "\t-n nbiter : number of iterations."
   echo -e "\t-N np_min : number of reconstructed resels."
   echo -e "\t-w [wmin,wmax] : wavelength range, in microns. No blanks in the argument, e.g.: [1.5,3.3] ."
-  echo -e "\t-r regularisation name : one of 'TOTVAR','PSD', 'L1L2', 'L1L2_WHITE', 'SOFT_SUPPORT' "
+  echo -e "\t-r regularisation name : one of 'TOTVAR','PSD', 'L1L2', 'L1L2WHITE', 'SOFT_SUPPORT' "
   exit 1
 }
 
