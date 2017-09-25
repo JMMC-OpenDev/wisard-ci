@@ -51,6 +51,8 @@
 
 pro wisardgui,input,output,target=target,interactive=interactive,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data
 
+@ "wisard_common.pro"
+
   forward_function WISARD_OIFITS2DATA,WISARD ; GDL does not need that, IDL insists on it!
 
   wisard_ci_version=getenv('WISARD_CI_VERSION')
@@ -92,16 +94,10 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   if n_elements(display) gt 0 then device, decomposed=0, retain=2
   if n_elements(display) gt 0 then interactive=1 
 
-; catch any error to exit cleanly in batch mode (GDL does not - yet)
-  if ~n_elements(interactive) then begin
-     CATCH, error_status
-     if (error_status ne 0) then begin
-        CATCH,/CANCEL
-        message,/reissue_last,/informational
-        print,"error has occured, exiting."
-        exit, status=1
-     end
-  end
+; define if interactive or not in common (for catch to work correctly)
+  if n_elements(interactive) eq 0 then wisard_is_interactive=0 else wisard_is_interactive=interactive
+
+@ "wisard_catch_noniteractive.pro"
 
 ; after catch to handle this first error message if necessary. 
   if (~strmatch(!PATH,'*wisardlib*')) then begin
