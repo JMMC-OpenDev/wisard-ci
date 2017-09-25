@@ -49,9 +49,12 @@
 ;
 ;-
 
-pro wisardgui,input,output,target=target,interactive=interactive,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data
+pro wisardgui,input,output,target=target,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data
 
 @ "wisard_common.pro"
+term=getenv("TERM")
+wisard_is_interactive =  strlen(term) gt 0 
+@ "wisard_catch_noniteractive.pro"
 
   forward_function WISARD_OIFITS2DATA,WISARD ; GDL does not need that, IDL insists on it!
 
@@ -91,15 +94,10 @@ pro wisardgui,input,output,target=target,interactive=interactive,threshold=thres
   if ~doovers     then oversampling=1 else oversampling = fix (oversampling) ; oversampling
   if ~doposit     then positivity=1   else positivity = fix (positivity) ; quoted: "misplaced curiosity"
 
-  if n_elements(display) gt 0 then device, decomposed=0, retain=2
-  if n_elements(display) gt 0 then interactive=1 
+  if wisard_is_interactive and keyword_set(display) then device, decomposed=0, retain=2
 
-; define if interactive or not in common (for catch to work correctly)
-  if n_elements(interactive) eq 0 then wisard_is_interactive=0 else wisard_is_interactive=interactive
 
-@ "wisard_catch_noniteractive.pro"
-
-; after catch to handle this first error message if necessary. 
+ ; after catch to handle this first error message if necessary. 
   if (~strmatch(!PATH,'*wisardlib*')) then begin
      b=routine_info('WISARDGUI',/source)
      c=file_dirname(b.path)
