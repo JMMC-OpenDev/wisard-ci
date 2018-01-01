@@ -109,6 +109,8 @@ wisard_is_interactive =  strlen(term) gt 0
   wave_min = -1
   wave_max = -1
   if (dowaverange) then begin
+     type = SIZE(waverange, /TYPE)
+     if (type eq 7) then result=execute('waverange='+waverange) ; to convert string to array
      wave_min=waverange[0]*1D-6
      wave_max=waverange[1]*1D-6
   endif
@@ -295,7 +297,7 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
 
 ; update fov to be no greater than max fov given by telescope diameter
 ; and lambad_min
-maxfov=(1.22*wave_min/(*oiarrayarr)[0].diameter)*180*3600.*1000./!DPI
+maxfov=(1.22*wave_min/((*(oiarrayarr[0])).diameter)[0])*180*3600.*1000./!DPI
 if (fov gt maxfov or fov le 0) then begin
    print,'Setting FOV to (maximum) value of '+strtrim(string(maxfov, format='(F6.2)'),2)+'.'
    fov=maxfov
@@ -435,9 +437,9 @@ end
   for i=0,n_elements(oit3arr)-1 do begin
      outhead=*oit3headarr[i]
      if (doWaveSubset) then begin
-        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset, operators=aux_output.operators )
+        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[t3inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset, operators=aux_output.operators )
      endif else begin 
-        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id , operators=aux_output.operators)
+        t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[t3inst[i]], aux_output, outhead, use_target=target_id , operators=aux_output.operators)
      endelse
     if ( n_elements(t3subset) gt 0 ) then begin ; no adding 'insname' as wisard uses both vis2 and t3. All relevant insnames have already been found.
         col_of_flag=where(strtrim(tag_names(t3subset),2) eq "FLAG", count)
