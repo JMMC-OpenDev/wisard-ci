@@ -91,7 +91,8 @@ function add_model_oit3,t3,wave,aux_output,header, use_target=tid, wsubs=wsubs, 
   ;convert phases to degrees!
   new_t3.ns_model_t3phi*=180.0d/!DPI
 
-  if (n_elements(wsubs) eq 0) then begin
+; FIXME: code with wsubs not 0 is wrong. Temporarily removed.
+;  if (n_elements(wsubs) eq 0) then begin
      ; add relevant units to header
      names=tag_names(new_t3)
      for itag=1,n_elements(names)-1 do begin
@@ -109,7 +110,7 @@ function add_model_oit3,t3,wave,aux_output,header, use_target=tid, wsubs=wsubs, 
         if (name eq 'NS_MODEL_T3PHI') then   FXADDPAR,header,tunitstr,'deg'
      end
      return, new_t3
-  endif
+;  endif
 ; or: apply wavelength subset if necessary
 
   wl=where(lambda ge wsubs[0] and lambda le wsubs[1], count)

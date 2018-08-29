@@ -66,7 +66,8 @@ function add_model_oivis2,vis2,wave,aux_output,header, use_target=tid, wsubs=wsu
   achix = reform(H#norm_x) ;
   new_vis2.ns_model_vis2=reform(reform(abs2(achix),nwave,ntimes))
 
-  if (n_elements(wsubs) eq 0) then begin
+ ; FIXME: code with wsubs not 0 is wrong. Temporarily removed.
+ ;if (n_elements(wsubs) eq 0) then begin
      ; add relevant units to header
      names=tag_names(new_vis2)
      for itag=1,n_elements(names)-1 do begin
@@ -79,7 +80,7 @@ function add_model_oivis2,vis2,wave,aux_output,header, use_target=tid, wsubs=wsu
         if (name eq 'VCOORD') then   FXADDPAR,header,tunitstr,'m'
      end
      return, new_vis2
-  endif
+  ;endif
 ; or: apply wavelength subset if necessary
 
   wl=where(lambda ge wsubs[0] and lambda le wsubs[1], count)
