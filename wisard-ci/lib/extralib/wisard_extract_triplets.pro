@@ -187,6 +187,7 @@ outvisflag_=14
 outvisdata_=15
 outviserr_=16
 ;
+secondInDays=1d/86400d
 
   if (n_elements(verbose) eq 0) then verbose=0
   if (n_elements(synchronicity) eq 0) then synchronicity=0.0d
@@ -302,10 +303,10 @@ outviserr_=16
      t3times=t3sortedtimes[uniq(t3sortedtimes)]
      nt3times=n_elements(t3times)  & if verbose gt 1 then print,"nt3times=",nt3times
 
-     goodTime=1L                ; index of good time (MJD) in structures.
+     goodTimeIndex=1L                ; index of good time (MJD) in structures.
      if ( (nt3times gt nt3mjd) or (total([oit3[theT3].mjd]) le 1.0d) ) then begin
         message,'inconsistent times (mjd vs. time), using TIME+DATE_OBS',/informational
-        goodTime=0              ; index of time
+        goodTimeIndex=0              ; index of time
                                 ; convert *all* times in mjd, by adding
                                 ; time/86400.0d to date_obs (already
                                 ; in MJD)
@@ -313,8 +314,8 @@ outviserr_=16
         oivis2[theV2].time=(oivis2[theV2].time/86400.0d)+oivis2[theV2].date_obs
         if (HasOiVis) then oivis[theVis].time=(oivis[theVis].time/86400.0d)+oivis[theVis].date_obs
      endif
-     ;recompute with correct time = goodTime
-     t3_timelist=(goodTime eq 1L)?[oit3[theT3].mjd]:[oit3[theT3].time] 
+     ;recompute with correct time = goodTimeIndex
+     t3_timelist=(goodTimeIndex eq 1L)?[oit3[theT3].mjd]:[oit3[theT3].time] 
      aa=sort(t3_timelist) & t3sortedtimes=t3_timelist[aa]
      t3times=t3sortedtimes[uniq(t3sortedtimes)]
      nt3times=n_elements(t3times)  & if verbose gt 1 then print,"adopted nt3times=",nt3times
@@ -388,8 +389,12 @@ outviserr_=16
      for iTime=0L,nt3times-1 do begin ;different times
         actual_t3_dim=0L
         myT3bundle=ptrarr(t3_nt3[iTime],dataSize) ;t3time,[t1,t2,t3],clot,cloterr,clotflag,[vis2time will be same],*vis2[3],*vis2err[3],*vis2flag[3],ucoord[3],vcoord[3],tel1[3],tel2[3],*wlen + [visphi, visphierr, visflag] + [visdata, viserr]
-        t3time=(*myT3Values[iTime,goodTime])[0]
+        t3time=(*myT3Values[iTime,goodTimeIndex])[0]
         if verbose gt 1 then print,format='(%"time %d: %20.12f")',iTime,t3time
+
+        t3timeMin=(*myT3Values[iTime,goodTimeIndex])[0]-(*myT3Values[t3int_time_]*secondInDays)/2.
+        t3timeMax=(*myT3Values[iTime,goodTimeIndex])[0]+(*myT3Values[t3int_time_]*secondInDays)/2.
+
         for it3=0L,t3_nt3[iTime]-1 do begin ;same time, all concerned triplets
            t3_12= oifits_baseline_encode((*myT3Values[iTime,t3sta_index_])[*,it3],0,1)
            t3_23= oifits_baseline_encode((*myT3Values[iTime,t3sta_index_])[*,it3],1,2)
@@ -400,13 +405,21 @@ outviserr_=16
            v2coord =(*myT3Values[iTime,t3v2coord_])[it3]
            v2found=[-1,-1,-1]
            v2=ptrarr(3) & v2err=ptrarr(3) & v2flag=ptrarr(3)  &v2TelIndex=ptrarr(3) &v2base=intarr(3) &ucoord=dblarr(3) &vcoord=dblarr(3)
-           ; list of v2 with time as t3time:
-;          if (synchronicity eq 0.0d) then  candidatev2=where( *myV2Values[goodTime] eq t3time, cv2count) else 
-           candidatev2=where( abs(*myV2Values[goodTime]-t3time) le synchronicity, cv2count) 
+           ; list of v2 with time as t3time: v2 time available segment (+/- v2dit/2) should intersect the t3time segment (+/- t3dit/2)
+           ; we should estimate the mutual coverage and take the greater one in case of doubt.
+
+           ; first pass: normal OIFITS, times are OK OR Synchronicity has been correctly given
+           candidatev2=where( abs(*myV2Values[goodTimeIndex]-t3time) le synchronicity*secondInDays, cv2count)
+           ; they are not ok, try to use DIT
            if (cv2count lt 3) then begin
-              if verbose gt 1 then print,format='(%"available number of V2 (%d) prevents to fully characterize triplet no %d at time %20.12f")',cv2count,it3,t3time
-              break             ; no closure with less than 3!
+              ; we now try to use the DIT interval trick
+              candidatev2=where( ( ( (*myV2Values[goodTimeIndex]) ge t3timeMin ) and ( (*myV2Values[goodTimeIndex]) le t3timeMax )  ), cv2count)
+              if (cv2count lt 3) then begin
+                 if verbose gt 1 then print,format='(%"available number of V2 (%d) prevents to fully characterize triplet no %d at time %20.12f")',cv2count,it3,t3time
+                 break             ; no closure with less than 3!
+              endif
            end
+
            for icount=0L,cv2count-1 do begin
               www=where(v2found eq -1, xxcount) & if (xxcount EQ 0) then break 
               iv2=candidatev2[icount]
@@ -427,10 +440,10 @@ outviserr_=16
                     v2telindex[vindex]=ptr_new((*myV2Values[v2sta_index_])[*,iv2])
                     v2base[vindex]=(*myV2Values[v2sta_index_])[iv2]
 ; sanity check:
-                    if vindex eq 0 and synchronicity eq 0.0d and abs(ucoord[0]-(*myT3Values[iTime,t3u1coord_])[it3]) gt 1D-6 then message,/info,"inconsistent ucoord 0 "+string(ucoord[0],format='(G)')+string( (*myT3Values[iTime,t3u1coord_])[it3],format='(G)')+", please report!"
-                    if vindex eq 0 and synchronicity eq 0.0d and abs(vcoord[0]-(*myT3Values[iTime,t3v1coord_])[it3])  gt 1D-6 then message,/info,"inconsistent vcoord 0"+string(vcoord[0],format='(G)')+string( (*myT3Values[iTime,t3v1coord_])[it3],format='(G)')+", please report!"
-                    if vindex eq 1 and synchronicity eq 0.0d and abs(ucoord[1]-(*myT3Values[iTime,t3u2coord_])[it3])  gt 1D-6 then message,/info,"inconsistent ucoord 1"+string(ucoord[1],format='(G)')+string( (*myT3Values[iTime,t3u2coord_])[it3],format='(G)')+", please report!"
-                    if vindex eq 1 and synchronicity eq 0.0d and abs(vcoord[1]-(*myT3Values[iTime,t3v2coord_])[it3])  gt 1D-6 then message,/info,"inconsistent vcoord 1"+string(vcoord[1],format='(G)')+string( (*myT3Values[iTime,t3v2coord_])[it3],format='(G)')+", please report!"
+                    if vindex eq 0 and synchronicity eq 0.0d and abs(ucoord[0]-(*myT3Values[iTime,t3u1coord_])[it3]) gt 1D then message,/info,"inconsistent ucoord 0 "+string(ucoord[0],format='(G)')+string( (*myT3Values[iTime,t3u1coord_])[it3],format='(G)')+", please report!"
+                    if vindex eq 0 and synchronicity eq 0.0d and abs(vcoord[0]-(*myT3Values[iTime,t3v1coord_])[it3])  gt 1D then message,/info,"inconsistent vcoord 0"+string(vcoord[0],format='(G)')+string( (*myT3Values[iTime,t3v1coord_])[it3],format='(G)')+", please report!"
+                    if vindex eq 1 and synchronicity eq 0.0d and abs(ucoord[1]-(*myT3Values[iTime,t3u2coord_])[it3])  gt 1D then message,/info,"inconsistent ucoord 1"+string(ucoord[1],format='(G)')+string( (*myT3Values[iTime,t3u2coord_])[it3],format='(G)')+", please report!"
+                    if vindex eq 1 and synchronicity eq 0.0d and abs(vcoord[1]-(*myT3Values[iTime,t3v2coord_])[it3])  gt 1D then message,/info,"inconsistent vcoord 1"+string(vcoord[1],format='(G)')+string( (*myT3Values[iTime,t3v2coord_])[it3],format='(G)')+", please report!"
                  endif
               endif
            endfor
@@ -438,7 +451,7 @@ outviserr_=16
               visfound=[-1,-1,-1]
               visphi=ptrarr(3) &visphierr=ptrarr(3) &visflag=ptrarr(3) &visdata=ptrarr(3) &viserr=ptrarr(3) 
               ; list of vis with time as t3time:
-              candidatevis=where( *myVisValues[goodTime] eq t3time, cviscount)
+              candidatevis=where( *myVisValues[goodTimeIndex] eq t3time, cviscount)
               if (cviscount le 0) then break ;
               for icount=0L,cviscount-1 do begin
                  www=where(visfound eq -1, xxcount) & if (xxcount EQ 0) then break 
