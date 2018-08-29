@@ -20,18 +20,21 @@
 ;     SIMULATED_DATA=SIMULATED_DATA, USE_FLAGGED_DATA=USE_FLAGGED_DATA
 ;
 ; KEYWORD PARAMETERS:
-;    INPUT: input OIFITS or (better) OImaging OIFITS file (contains
-;    already guess image and parameters. Otherwise, use Keywords to enter
-;    these parameters
-;    OUTPUT: product  OImaging OIFITS file name.
+;    INPUT: input OIFITS or (better) OImaging OIFITS file (that contains
+;    already guess image and parameters). 
+;    Otherwise, use Keywords to enter these parameters
 ;
-;    TARGET: the object name (in case there are many in the input
-;    file)
+;    OUTPUT: product: an OImaging OIFITS file name. Image is in main header.
+;
+;    TARGET: the object name (in case there are many in the input file)
 ;    NBITER: max number of iterations (50 by default)
 ;    NP_MIN: minimum number of resels to reconstruct. default computed
 ;    internally 
-;    GUESS: Guess image (fits, seed doc for header parameters). Not mandatory.
-;    INIT_IMG: start with this image. Very useful for a start.
+;    INIT_IMG: Guess start image (fits). Supposedly not mandatory
+;    according to the doc although unescapable in practice.
+;
+;    WAVERANGE=[min,max] to limit reconstruction to this wave
+;    interval. Values in micrometers. Must include at least ONE channel.
 ;
 ;    The other kw are best described in the documentation, see:
 ;    WISARD:
@@ -39,8 +42,15 @@
 ;    OImaging interface:
 ;    http://www.mariotti.fr/doc/approved/JRA4Fp7Report2016.pdf
 ;
+; EXAMPLE:
+;    wisardgui,"inputdata/2004/2004-FKV1137.fits","output_of_example.fits",$
+;    nbiter=1000,fov=16,np_min=64,/display,/simulated_data
+;
+; NOTE: 
+;    At the moment, the model visibility will be forced in ALL wavelengths, not only the
+;    ones that were used (case where WAVERANGE was specified). FIXME!
 ; LICENCE:
-; Copyright (C) 2017, G. Duvert unless explicitly mentioned in files.
+;    Copyright (C) 2017, G. Duvert unless explicitly mentioned in files.
 ;
 ; This program is free software; you can redistribute it and/or modify  
 ; it under the terms of the GNU General Public License as published by  
@@ -49,7 +59,12 @@
 ;
 ;-
 
-pro wisardgui,input,output,target=target,threshold=threshold,guess=guess,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data
+pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,_extra=ex,help=help
+
+if keyword_set(help) then begin
+ doc_library,"wisardgui"
+ exit
+end
 
 @ "wisard_common.pro"
 term=getenv("TERM")
@@ -64,7 +79,6 @@ wisard_is_interactive =  strlen(term) gt 0
 
   dotarget=n_elements(target) ne 0
   dothreshold=n_elements(threshold) ne 0
-  doguess=n_elements(guess) ne 0
   donbiter=n_elements(nbiter) ne 0
   dofov=n_elements(fov) ne 0
   donp_min=n_elements(np_min) ne 0
@@ -83,7 +97,6 @@ wisard_is_interactive =  strlen(term) gt 0
 ;; defaults in absence of passed values. Normally these should be read in one of the headers.
   if ~dotarget    then target="*"
   if ~dothreshold then threshold=1d-6 else threshold=double(threshold); convergence threshold
-  if ~doguess     then guess=0        ; default : non guess image
   if ~donbiter    then nbiter=50      else nbiter=fix(nbiter) ; number of iterations.
   if ~dofov       then fov=14.0D      else fov = double(fov) ; Field of View of reconstructed image (14*14 marcsec^2 here)
   if ~donp_min    then np_min=32L      else np_min = fix(np_min) ; width of reconstructed image in pixels (same along x and y axis).
@@ -253,7 +266,7 @@ if ((size(guess))[0] gt 2) then guess=guess[*,*,0,0,0,0,0]
   endif else begin
      targets=strtrim(oitarget.target,2)
      w=where(targets eq target, count)
-     if (count lt 1) then message,"target not found in input file."
+     if (count lt 1) then message,"ERROR: target not found in input file, exiting."
      target_id=oitarget[w[0]].target_id
      raep0=oitarget[w[0]].raep0
      decep0=oitarget[w[0]].decep0
@@ -273,10 +286,10 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
   for i=0,n_elements(oit3arr)-1 do t3inst[i]=(where(sxpar(*oit3headarr[i],"INSNAME") eq allinsnames))[0]
 
 ; all values defined, read data
-  data=wisard_oifits2data(input,targetname=target)
+  data=wisard_oifits2data(input,targetname=target,_extra=ex)
 
 ; there must be some data left to work with
-  if (~finite(total(data.vis2err)) || ~finite(total(data.cloterr))) then message,"Only Flagged Data Available, Aborting."
+  if (~finite(total(data.vis2err)) || ~finite(total(data.cloterr))) then message,"ERROR: Only Flagged Data Available, Aborting."
 
   doWaveSubset=0
 ; simple wavelength selection. If selection is >= min max range, no
@@ -286,7 +299,7 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
      if count gt 0 then begin ; there is indeed a subset asked!
         doWaveSubset=1
         w=where(data.wlen ge wave_min and data.wlen le wave_max, count)
-        if count lt 1 then message,"no such wavelength range in data"
+        if count lt 1 then message,"ERROR: invalid wavelength range, exiting. (request is probably smaller than a single instrument channel?)"
         data = data[w]
      endif
   end else begin                ; set values of wave_min and max to used values:
@@ -315,13 +328,13 @@ end
            distance = double(shift(dist(np_min),np_min/2,np_min/2))
            psd = 1D/((distance^3 > 1D) < 1D6)
         endelse
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim)
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim,_extra=ex)
      end
 
      2: begin
         scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         delta = 1D
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim)
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim,_extra=ex)
      end
 
      3: begin
@@ -333,10 +346,10 @@ end
      4: begin
         if ~n_elements(fwhm) then fwhm=10                  ; pixels
         if ~n_elements(mu_support) then mu_support=10.0    ; why not?
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim)
+        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim,_extra=ex)
      end
      
-     else: message,"regularization not yet supported, FIXME!"
+     else: message,"ERROR: regularization not yet supported, FIXME!"
   endcase
 
 ; prepare output HDU
@@ -345,9 +358,9 @@ end
   FXADDPAR,outhead,'TARGET',target
   FXADDPAR,outhead,'WAVE_MIN',wave_min
   FXADDPAR,outhead,'WAVE_MAX',wave_max
-  FXADDPAR,outhead,'USE_VIS', 'F'
+  FXADDPAR,outhead,'USE_VIS', 'NONE'
   FXADDPAR,outhead,'USE_VIS2','T'
-  FXADDPAR,outhead,'USE_T3', 'T'
+  FXADDPAR,outhead,'USE_T3', 'ALL'
   if (n_elements(init_img) gt 0) then FXADDPAR,outhead,'INIT_IMG',init_img ; the init image file passed
   FXADDPAR,outhead,'MAXITER',nbiter
   FXADDPAR,outhead,'RGL_NAME',regul_name[regul]
@@ -418,6 +431,10 @@ end
 ; wavelengths or wavelength subsets.
   for i=0,n_elements(oivis2arr)-1 do begin
      outhead=*oivis2headarr[i]
+; note: the doWaveSubset trick is not correctly implemented in the
+; subroutine and is temporarily ignored if fact. Meaning that the
+; model visibility will be forced in ALL wavelengths, not only the
+; ones that were used.
      if (doWaveSubset) then begin
         vis2subset=add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset, operators=aux_output.operators)
      endif else begin
@@ -436,6 +453,7 @@ end
 
   for i=0,n_elements(oit3arr)-1 do begin
      outhead=*oit3headarr[i]
+; note: the doWaveSubset trick is not correctly implemented in the subroutine
      if (doWaveSubset) then begin
         t3subset=add_model_oit3( *oit3arr[i], *oiwavearr[t3inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset, operators=aux_output.operators )
      endif else begin 
@@ -451,6 +469,7 @@ end
      insname=strtrim(sxpar(*(oiwaveheadarr[i]),"INSNAME"),2) ; avoid problems with blanks.
      w=where(goodinsnamelist eq insname, count)
      if (count gt 0) then begin
+        ; note: the doWaveSubset trick is not correctly implemented in the subroutine
         if (doWaveSubset) then begin                                           ; write only wavelength subset for specific insname
            ww=where((*oiwavearr[i]).eff_wave ge waveSubset[0] and  (*oiwavearr[i]).eff_wave le waveSubset[1], count)
            if (count gt 0) then mwrfits,(*oiwavearr[i])[ww],output,*(oiwaveheadarr[i]),/silent,/no_comment
