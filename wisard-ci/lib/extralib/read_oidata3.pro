@@ -399,16 +399,18 @@ common oifits_uniq_inst_common,idupsize,l_insname_duplicates,n_insname_duplicate
                  maxtelindex=max(oiarray_full.STA_INDEX)
               endif  else begin
                                 ; add a oiarray telescope only if it does not exist
-                 nin= ntel
+                 nin= n_elements(oiarray)
                  nout= n_elements(oiarray_full)
                  oktoadd=intarr(nin)
                  for j=0L, nin-1 do begin
                     oktoadd[J]=1
                     telin_id=oiarray[j].STA_INDEX
-                    telin_tag=oiarray[j].ARRNAME+":"+oiarray[j].STA_NAME
+;                    telin_tag=oiarray[j].ARRNAME+":"+oiarray[j].STA_NAME
+                    telin_tag=oiarray[j].STA_NAME
                     for i=0L,nout-1 do begin
                        telout_id=oiarray_full[i].STA_INDEX
-                       telout_tag=oiarray_full[i].ARRNAME+":"+oiarray_full[i].STA_NAME
+;                       telout_tag=oiarray_full[i].ARRNAME+":"+oiarray_full[i].STA_NAME
+                       telout_tag=oiarray_full[i].STA_NAME
                        if (telout_tag EQ telin_tag) then begin
 ;                    print,"found same:"+telout_tag
                           oktoadd[J]=0
@@ -443,7 +445,6 @@ common oifits_uniq_inst_common,idupsize,l_insname_duplicates,n_insname_duplicate
      fxbclose,unit,errmsg=errmsg
      exten=1                    ;total extensions
      errmsg=''
-
      fxbopen, unit,file,exten,header,errmsg=errmsg
 
 ; look for OI_WAVELENGTH
@@ -501,16 +502,18 @@ common oifits_uniq_inst_common,idupsize,l_insname_duplicates,n_insname_duplicate
                           oiwavelength.INSNAME=oiwavelength_full[iout].INSNAME+"_"
                           if (verbose ne 0) then print,"different sizes, added as "+oiwavelength.INSNAME+"_"
                        endelse
-                    endif else begin
-                       if (nwave eq n_elements(*(oiwavelength_full[iout]).eff_wave)) then begin 
-                          if ( TOTAL(*(oiwavelength_full[iout].eff_wave) eq *(oiwavelength.eff_wave) ) eq nwave ) THEN BEGIN
-                             oktoadd=0
-                             if (verbose ne 0) then print,'Table '+oiwavelength.insname+" equals table "+oiwavelength_full[iout].insname
-                             insname_duplicates[n_insname_duplicates[iout],iout]=oiwavelength.insname
-                             n_insname_duplicates[iout]+=1
-                          endif
-                       endif
-                    endelse
+                    endif
+                                ; CF problems GRAVITY. It is not desirable to check wether two insnames actually are the same. 
+                    ; else begin
+                    ; if (nwave eq n_elements(*(oiwavelength_full[iout]).eff_wave)) then begin 
+                    ;    if ( TOTAL(*(oiwavelength_full[iout].eff_wave) eq *(oiwavelength.eff_wave) ) eq nwave ) THEN BEGIN
+                    ;       oktoadd=0
+                    ;       if (verbose ne 0) then print,'Table '+oiwavelength.insname+" equals table "+oiwavelength_full[iout].insname
+                    ;       insname_duplicates[n_insname_duplicates[iout],iout]=oiwavelength.insname
+                    ;       n_insname_duplicates[iout]+=1
+                    ;    endif
+                    ; endif
+                    ; endelse
                  endfor
                  if (oktoadd GT 0) then begin
                     if (verbose ne 0) then print,"Adding "+oiwavelength.INSNAME
