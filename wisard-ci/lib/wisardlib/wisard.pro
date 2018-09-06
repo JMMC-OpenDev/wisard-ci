@@ -54,7 +54,7 @@
 ; (3) L. M. Mugnier, G. Le Besnerais, and S. Meimon, 
 ;   "Inversion in optical imaging through atmospheric turbulence", 
 ;   chapter 10 of Bayesian Approach for Inverse Problems, 
-;   edited by J�r�me Idier, ISTE, London, 2008.
+;   edited by Jerome Idier, ISTE, London, 2008.
 ;
   
 
@@ -497,7 +497,6 @@ FUNCTION WISARD, data,  $
   mult_phasors=multiply_phasors(cmdata.vis,operators.C) ; in wisardlib : 
   if keyword_set(print_times) THEN print,' Time multiply : ', SYSTIME(/SECONDS )-t
   
-  if keyword_set(print_times) THEN t=SYSTIME(/SECONDS)
   cloture_from_cmdata=angle(mult_phasors)
   if keyword_set(print_times) THEN print,' Time angle : ', SYSTIME(/SECONDS )-t
  
