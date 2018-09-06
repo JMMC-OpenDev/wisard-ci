@@ -283,15 +283,15 @@ secondInDays=1d/86400d
 ; incorrect (null) we choose MJD, but test if time gives more 'times' than
 ; TIME, on which case we choose time, but add date_obs as to convert
 ; to a simili-MJD (since we may have the same time in other,
-; unrelated, observaions.
+; unrelated, observations).
 
   for iBackend=0L,nbackends-1 do begin
      if verbose gt 0 then print,format='(%"data from instrument number %d name %s")',iBackend,list_of_backends[iBackend]
-     theT3=*(perBackendT3List[iBackend])             & if total(theT3 eq -1) eq 1 then break
-     theV2=*(perBackendV2List[iBackend])             & if total(theV2 eq -1) eq 1 then break
+     theT3=*(perBackendT3List[iBackend])             & if total(theT3 eq -1) eq 1 then CONTINUE
+     theV2=*(perBackendV2List[iBackend])             & if total(theV2 eq -1) eq 1 then CONTINUE
      if (hasOiVis) then begin 
         theVis=*(perBackendVisList[iBackend]) 
-        if total(theVis eq -1) eq 1 then break
+        if total(theVis eq -1) eq 1 then CONTINUE
      endif
 
      t3_timelist=[oit3[theT3].mjd] 
@@ -551,7 +551,7 @@ NO_T3_HERE:
   if (total(size(outStructure)) eq 0) then begin 
      message,/informational,"Severe problem with this dataset, stopping here."
      message,/informational,"Not able to find at least one simultaneous complete (V2 and T3) observation in DataSet."
-     message,"Consider using the option ""synchronicity=xx"" (xx in seconds) or edit the OI-FITS file. "
+     message,"Consider using one of the options ""/merge_insnames"" or ""synchronicity=xx"" (xx in seconds) or edit the OI-FITS file. "
   endif
   size=0 & for i=0L,n_elements(outStructure)-1 do size+=(size(*outStructure[i],/dim))[0]
   if (size ne nt3) then message,/informational,"Step 1: Retained "+string(size,format='(I)')+" closures out of "+string(nt3,format='(I)')+" present initially in dataset."

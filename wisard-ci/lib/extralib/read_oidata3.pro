@@ -22,6 +22,15 @@
 ;     different MJD (to be 'observed' a different day). Useful only
 ;     when using data containing false values of MJD (e.g. simulated
 ;     data).
+;     /MERGE_INSNAMES : Sometimes the INSNAME of VIS2 and T3 of
+;     malformed OIFITS (concatened for example) files are not
+;     the same in the data although they are indeed related (the V2 are
+;     simultaneous with the T3). This switch permits to recognize if
+;     several INSNAMES are actually different names for the same
+;     spectral setup, and regroups all these equivalent INSNAMEs in
+;     one. This permits (because the program is organised this way) to
+;     associate V2s and T3s when it would not have been possible otherwise
+;
 ;
 ; OUTPUTS:
 ;
@@ -175,9 +184,11 @@ end
 
 pro read_oidata3, filelist, oiarray, oitarget,oiwavelength,$
                   oivis,oivis2, oit3, inventory=inventory, verbose=verbose, $
-                  force_different_times=force_different_times
+                  force_different_times=force_different_times, $
+                  merge_insnames=merge_insnames
 
 common oifits_uniq_inst_common,idupsize,l_insname_duplicates,n_insname_duplicates,insname_duplicates,list_of_replacement_indexes
+  merge_insnames = keyword_set(merge_insnames)
   currentIds={mystar, id:0, goodid:0, name:''}
   angularPrecision=1.0/3600.; 1 second of arc
   idupsize=256 ; 256 tables in for 256 tables out!
@@ -483,7 +494,7 @@ common oifits_uniq_inst_common,idupsize,l_insname_duplicates,n_insname_duplicate
                  l_insname_duplicates+=1
               if (verbose gt 1) then begin & for iout=0L,l_insname_duplicates-1 DO print,"first table: oktoadd("+oiwavelength_full[iout].INSNAME+")" & endif
               endif else begin
-                                ; add a oiwavelength table only if it does not exist
+                 ; add a oiwavelength table only if it does not exist
                  nout= n_elements(oiwavelength_full)
                  oktoadd=1
                  for iout=0L,nout-1 do begin
@@ -502,18 +513,18 @@ common oifits_uniq_inst_common,idupsize,l_insname_duplicates,n_insname_duplicate
                           oiwavelength.INSNAME=oiwavelength_full[iout].INSNAME+"_"
                           if (verbose ne 0) then print,"different sizes, added as "+oiwavelength.INSNAME+"_"
                        endelse
-                    endif
-                                ; CF problems GRAVITY. It is not desirable to check wether two insnames actually are the same. 
-                    ; else begin
-                    ; if (nwave eq n_elements(*(oiwavelength_full[iout]).eff_wave)) then begin 
-                    ;    if ( TOTAL(*(oiwavelength_full[iout].eff_wave) eq *(oiwavelength.eff_wave) ) eq nwave ) THEN BEGIN
-                    ;       oktoadd=0
-                    ;       if (verbose ne 0) then print,'Table '+oiwavelength.insname+" equals table "+oiwavelength_full[iout].insname
-                    ;       insname_duplicates[n_insname_duplicates[iout],iout]=oiwavelength.insname
-                    ;       n_insname_duplicates[iout]+=1
-                    ;    endif
-                    ; endif
-                    ; endelse
+                    endif else begin 
+                       if (merge_insnames) then begin ; CF problems GRAVITY. It is not desirable to check wether two insnames actually are the same. 
+                          if (nwave eq n_elements(*(oiwavelength_full[iout]).eff_wave)) then begin 
+                             if ( TOTAL(*(oiwavelength_full[iout].eff_wave) eq *(oiwavelength.eff_wave) ) eq nwave ) THEN BEGIN
+                                oktoadd=0
+                                if (verbose ne 0) then print,'Table '+oiwavelength.insname+" equals table "+oiwavelength_full[iout].insname
+                                insname_duplicates[n_insname_duplicates[iout],iout]=oiwavelength.insname
+                                n_insname_duplicates[iout]+=1
+                             endif
+                          endif
+                       endif
+                    endelse
                  endfor
                  if (oktoadd GT 0) then begin
                     if (verbose ne 0) then print,"Adding "+oiwavelength.INSNAME
