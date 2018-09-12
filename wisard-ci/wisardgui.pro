@@ -17,7 +17,9 @@
 ;     POSITIVITY=POSITIVITY,OVERSAMPLING=OVERSAMPLING,
 ;     INIT_IMG=INIT_IMG,RGL_PRIO=RGL_PRIO,DISPLAY=DISPLAY,
 ;     MU_SUPPORT=MU_SUPPORT, FWHM=FWHM, WAVERANGE=WAVERANGE,
-;     SIMULATED_DATA=SIMULATED_DATA, USE_FLAGGED_DATA=USE_FLAGGED_DATA
+;     SIMULATED_DATA=SIMULATED_DATA,
+;     USE_FLAGGED_DATA=USE_FLAGGED_DATA,
+;     RECONSTRUCTED_IMAGE=MYIMAGE,SCALE=SCALE,DELTA=DELTA,/HELP
 ;
 ; KEYWORD PARAMETERS:
 ;    INPUT: input OIFITS or (better) OImaging OIFITS file (that contains
@@ -34,7 +36,11 @@
 ;    according to the doc although unescapable in practice.
 ;
 ;    WAVERANGE=[min,max] to limit reconstruction to this wave
-;    interval. Values in micrometers. Must include at least ONE channel.
+;    interval. Values in micrometers. Must include at least ONE
+;    channel.
+;    RECONSTRUCTED_IMAGE=xx the image will also be returned in the
+;    variable xx. Interactive mode only. Can be used as an imput
+;    image, as init_img reads also IDL/GDL variables. 
 ;
 ;    The other kw are best described in the documentation, see:
 ;    WISARD:
@@ -43,8 +49,9 @@
 ;    http://www.mariotti.fr/doc/approved/JRA4Fp7Report2016.pdf
 ;
 ; EXAMPLE:
-;    wisardgui,"inputdata/2004/2004-FKV1137.fits","output_of_example.fits",$
-;    nbiter=1000,fov=16,np_min=64,/display,/simulated_data
+;    wisardgui,"inputdata/2004/2004-FKV1137.fits","output_of_example.fits", $
+;    nbiter=1000,fov=16,np_min=64,waverange=[1.0,5.0],reconstructed_image=myimage, $
+;    regul='L1L2WHITE',/display,/simulated_data
 ;
 ; NOTE: 
 ;    At the moment, the model visibility will be forced in ALL wavelengths, not only the
@@ -59,17 +66,17 @@
 ;
 ;-
 
-pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,_extra=ex,help=help
-
-if keyword_set(help) then begin
- doc_library,"wisardgui"
- exit
-end
+pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,delta=delta,_extra=ex,help=help
 
 @ "wisard_common.pro"
 term=getenv("TERM")
 wisard_is_interactive =  strlen(term) gt 0 
 @ "wisard_catch_noniteractive.pro"
+
+if keyword_set(help) then begin
+ doc_library,"wisardgui"
+ if (~(wisard_is_interactive)) then exit else return
+end
 
   forward_function WISARD_OIFITS2DATA,WISARD ; GDL does not need that, IDL insists on it!
 
@@ -77,35 +84,31 @@ wisard_is_interactive =  strlen(term) gt 0
   if (strlen( wisard_ci_version) lt 1) then wisard_ci_version='Unversioned'
   message,/informational,"Welcome to Wisard, version "+wisard_ci_version+", you have accepted the copyrights."
 
-  dotarget=n_elements(target) ne 0
+
+  ; memorize passed line values
+  dotarget=n_elements(target) ne 0 
   dothreshold=n_elements(threshold) ne 0
   donbiter=n_elements(nbiter) ne 0
   dofov=n_elements(fov) ne 0
   donp_min=n_elements(np_min) ne 0
   doregul=n_elements(regul) ne 0
-  doovers=n_elements(oversampling) ne 0
-  doposit=n_elements(positivity) ne 0
   doinit_img=n_elements(init_img) ne 0
   dorgl_prio=n_elements(rgl_prio) ne 0
   dowaverange=n_elements(waverange) ne 0
-  
-;; define constants
-  regul_name=['TOTVAR','PSD','L1L2','L1L2WHITE','SOFT_SUPPORT']
-  defsysv, '!DI', dcomplex(0, 1), 1 ;Define i; i^2=-1 as readonly system-variable
-  onemas=1d-3*(!DPi/180D)/3600D     ; 1 mas in radian
-  
-;; defaults in absence of passed values. Normally these should be read in one of the headers.
-  if ~dotarget    then target="*"
-  if ~dothreshold then threshold=1d-6 else threshold=double(threshold); convergence threshold
-  if ~donbiter    then nbiter=50      else nbiter=fix(nbiter) ; number of iterations.
-  if ~dofov       then fov=14.0D      else fov = double(fov) ; Field of View of reconstructed image (14*14 marcsec^2 here)
-  if ~donp_min    then np_min=32L      else np_min = fix(np_min) ; width of reconstructed image in pixels (same along x and y axis).
-  if ~doregul     then regul=0  else begin ; TOTVAR by default
-      w=where(strtrim(regul_name,2) eq regul, count) ; regul is a name here
-      if count lt 1 then regul=0 else regul=w[0]       ; regul is now an integer: 0:totvar, 1:psd, 2:l1l2, 3:l1l2_white, 4:support 
-  endelse
-  if ~doovers     then oversampling=1 else oversampling = fix (oversampling) ; oversampling
-  if ~doposit     then positivity=1   else positivity = fix (positivity) ; quoted: "misplaced curiosity"
+  doScale=n_elements(scale) ne 0
+  doDelta=n_elements(delta) ne 0
+  if dotarget then passed_target=target 
+  if dothreshold then passed_threshold=threshold
+  if donbiter then passed_nbiter=nbiter
+  if dofov then passed_fov=fov
+  if donp_min then passed_np_min = np_min
+  if doregul then passed_regul=regul
+  if doinit_img then passed_init_img=init_img
+  if dorgl_prio then passed_rgl_prio=rgl_prio
+  if dowaverange then passed_waverange=waverange
+  if doScale then passed_scale=scale
+  if doDelta then passed_delta=delta
+
 
   if wisard_is_interactive and keyword_set(display) then device, decomposed=0, retain=2
 
@@ -119,15 +122,35 @@ wisard_is_interactive =  strlen(term) gt 0
      if (~strmatch(!PATH,'*wisardlib*')) then message,"Unable to set PATH to wisard libraries. Please set up yourself"
   endif
 
+;; define constants
+  regul_name=['L1L2','L1L2WHITE','PSD','SOFT_SUPPORT'] & default_regul=0 ; L1L2
+  defsysv, '!DI', dcomplex(0, 1), 1 ;Define i; i^2=-1 as readonly system-variable
+  onemas=1d-3*(!DPi/180D)/3600D     ; 1 mas in radian
+
+;; non-OImaging options:
+  doreconstructed_img=arg_present(reconstructed_img)
+  doovers=n_elements(oversampling) ne 0
+  doposit=n_elements(positivity) ne 0
+  if ~doovers     then oversampling=1 else oversampling = fix (oversampling) ; oversampling
+  if ~doposit     then positivity=1   else positivity = fix (positivity) ; quoted: "misplaced curiosity"
+  
+;; defaults in absence of passed values. Will be updated by the ones
+;; in the input file, which are superseded by the eventual arguments passed.
+  target='*'
+  threshold=1d-6
+  nbiter=50
+  fov=14.0D
+  np_min=32L
+  regul=default_regul
   wave_min = -1
   wave_max = -1
-  if (dowaverange) then begin
-     type = SIZE(waverange, /TYPE)
-     if (type eq 7) then result=execute('waverange='+waverange) ; to convert string to array
-     wave_min=waverange[0]*1D-6
-     wave_max=waverange[1]*1D-6
-  endif
-;; read input file and get start image & parameters. If no parameters are present (bare oifits) use defaults.
+  guess = 0
+  init_img = ''
+  prior = 0
+  find_init_img = 0
+  find_prior_img = 0
+
+;; First read input file and get start image & parameters that overread defaults.
 ;; FITS_INFO is robust in case of strange tables (no column table). 
   fits_info,input, n_ext=next, extname=extname, /silent
   if (next le 4) then message,"Input file is probably not an OIFITS file at all!"
@@ -149,44 +172,83 @@ wisard_is_interactive =  strlen(term) gt 0
      if ( extname[i] EQ "IMAGE-OI INPUT PARAM") then begin 
 ; use a special trick: mrdfits is unable to read this kind of data
 ; where TFIELDS=0. use fits_read with only headers
-        fits_read,input,dummy,inputparamsheader,/header_only,exten_no=i
+        fits_read,input,dummy,input_params_header,/header_only,exten_no=i
 ; parse relevant parameters
-        if ~dotarget then begin
-           req_target=strtrim(sxpar(inputparamsheader,"TARGET"),2) ; avoid problems with blanks.
-           if req_target ne '0' then target=req_target
-        end
-        if ~donbiter then begin
-           req_nbiter=sxpar(inputparamsheader,"MAXITER")
-           if req_nbiter gt 0 then nbiter=req_nbiter
-        end
-        if ~doregul then begin
-           req_rgl_name=strtrim(sxpar(inputparamsheader,"RGL_NAME"),2) ; avoid problems with blanks.
-           if req_rgl_name ne '0' then begin
-              w=where(strtrim(req_rgl_name,2) eq regul_name, count)
-              if count lt 1 then regul=0 else regul=w[0] ; avoid : ;  message,"unrecognized regularisation name."
-           end 
-        end
-        if ~dofov then begin
-           req_fov=sxpar(inputparamsheader,"FOV") 
-           if req_fov gt 0 then fov=req_fov
-        end
-        if ~dothreshold then begin
-           req_threshold=sxpar(inputparamsheader,"THRESHOL") 
-           if req_threshold gt 0 then threshold=req_threshold
-        end
-        if ~donp_min then begin
-           req_np_min=sxpar(inputparamsheader,"NP_MIN") 
-           if req_np_min gt 0 then np_min=req_np_min
-        end
-        if ~doovers then begin
-           req_overs=sxpar(inputparamsheader,"OVERSAMP") 
-           if req_overs gt 0 then oversampling=req_overs
-        end
-        if ~doinit_img then init_img=strtrim(sxpar(inputparamsheader,"INIT_IMG"),2) ; avoid problems with blanks.
-        if ~dorgl_prio then rgl_prio=strtrim(sxpar(inputparamsheader,"RGL_PRIO"),2) ; avoid problems with blanks.
 
-        if ~dowaverange then wave_min=sxpar(inputparamsheader,"WAVE_MIN")
-        if ~dowaverange then wave_max=sxpar(inputparamsheader,"WAVE_MAX")
+; TARGET
+        req_target=strtrim(sxpar(input_params_header,"TARGET"),2) ; avoid problems with blanks.
+        if req_target ne '0' then target=req_target
+
+; WAVE_MIN
+        req_wave_min=sxpar(input_params_header,"WAVE_MIN")
+        if req_wave_min ne '0' then wave_min=req_wave_min
+
+; WAVE_MAX
+        req_wave_max=sxpar(input_params_header,"WAVE_MIN")
+        if req_wave_max ne '0' then wave_max=req_wave_max
+
+; USE_VIS,USE_VIS2,USE_T3: ignored
+
+; INIT_IMG
+        req_init_img=strtrim(sxpar(input_params_header,"INIT_IMG"),2) ; avoid problems with blanks.
+        if req_init_img ne '0' then begin
+           init_img=req_init_img ; it is the name of a HDUNAME.
+           find_init_img = 1 ; will force to find it
+           message,/inform,"... OIMaging file requests "+init_img+" as init image"
+        endif
+
+; MAXITER
+        req_nbiter=sxpar(input_params_header,"MAXITER")
+        if req_nbiter gt 0 then nbiter=req_nbiter
+
+; RGL_NAME
+        req_rgl_name=strtrim(sxpar(input_params_header,"RGL_NAME"),2) ; avoid problems with blanks.
+        if req_rgl_name ne '0' then begin
+           w=where(strtrim(req_rgl_name,2) eq regul_name, count)
+           if count lt 1 then regul=default_regul else regul=w[0]
+        endif
+
+; RGL_WGHT,RGL_ALPHA,RGL_BETA: ignored at the moment
+
+; RGL_PRIO
+        req_rgl_prio=strtrim(sxpar(input_params_header,"RGL_PRIO"),2) ; avoid problems with blanks.
+        if req_rgl_prio ne '0' then begin
+           rgl_prio=req_rgl_prio ; it is the name of a HDUNAME.
+           find_prior_img=1
+           message,/inform,"... OIMaging file requests "+rgl_prio+" as regularization prior"
+        endif
+; AUTO_WGHT ?
+; NP_MIN
+        req_np_min=sxpar(input_params_header,"NP_MIN") 
+        if req_np_min gt 0 then np_min=req_np_min
+
+; FLUXERR -> threshold
+        req_fluxerr=sxpar(input_params_header,"FLUXERR") 
+        if req_fluxerr gt 0 then threshold=double(req_fluxerr)/(np_min)^2
+
+; FOV
+        req_fov=sxpar(input_params_header,"FOV") 
+        if req_fov gt 0 then fov=req_fov
+        
+; WISARD: SCALE: WARNING: This is not the same logic. As SCALE default
+; is best computed from the image and NP, wee need to know if a SCALE
+; was forced either by the commandline or the OIMaging file.
+        if (~doScale) then begin   ; factor for balance between regularization **** and in cost function
+           req_scale=sxpar(input_params_header,"SCALE") 
+           if req_scale gt 0 then begin ; meaning <= 0 will provide the default.
+              scale=req_scale
+              doScale = 1
+           endif
+        endif
+; WISARD: DELTA: WARNIG: Same logic as for SCALE/
+        if (~doDelta) then begin   ; factor for balance between regularization **** and in cost function
+           req_delta=sxpar(input_params_header,"DELTA") 
+           if req_delta gt 0 then begin; meaning <= 0 will provide the default.
+              delta=req_delta
+              doDelta = 1
+           endif
+        endif
+
      endif else if ( extname[i] EQ "IMAGE-OI OUTPUT PARAM") then begin ; idem trick
 ; do nothing
      endif else if extname[i] eq "OI_T3" then begin
@@ -222,41 +284,86 @@ wisard_is_interactive =  strlen(term) gt 0
      end
   end
 
-; if init_img is defined in header, then find this hdu, read image and use it as guess
-  if ~doinit_img then begin
-     if n_elements(guess) eq 0 and n_elements(init_img) gt 0 then begin
-        w=where(hdunames eq init_img, count)
-        if (count gt 1) then print, 'multiple init images found in input file, discarding all but first one.'
-        if (count ge 1) then guess=mrdfits(input,hdunumbers[w[0]],header) ; TODO: use header coordinates etc.
-     endif
-  endif else begin
-                                ; if init_img is a string, read it as
-                                ; fits. Else check it is a 2d array
-     sz = size(init_img) & nsz = N_ELEMENTS(sz) & typesz = sz[nsz-2]  
-     if (typesz eq 7) then begin 
-        guess=mrdfits(init_img,0,init_img_header)
-        init_img=FILE_BASENAME(init_img) ; remove potentially harmful long dirname
-     endif else begin 
-        guess=init_img          ; a passed 2d array.
-        delvar,init_img         ; avoid further us of init_img as if it was a filename.
-     endelse
-  end
-
-; if guess is a cube, take 1st plane
-if ((size(guess))[0] gt 2) then guess=guess[*,*,0,0,0,0,0]
-
+; if init_img is defined in header, then find this hdu, read image and
+; use it as guess. remember HDU as we  will copy it.
+  if find_init_img then begin
+     w=where(hdunames eq init_img, count)
+     if (count gt 1) then print, 'multiple init images found in input file, discarding all but first one.'
+     if (count ge 1) then begin 
+        hdu_init_img=hdunumbers[w[0]]
+        guess=mrdfits(input,hdu_init_img,init_img_header) ; TODO: use header coordinates etc.
+        message,/inform,'... found init image "'+init_img+'" at HDU #'+strtrim(string(hdu_init_img),2)
+     endif else find_init_img = 0
+  endif
 
 ; if rgl_prio is defined in header, then find this hdu, read image and use it as guess
-  if ~dorgl_prio then begin
-     prior=0                    ; a good starting point...
-     if n_elements(rgl_prio) gt 0 then begin
-        w=where(extname eq rgl_prio, count)
-        if (count gt 1) then print, 'multiple init images found in input file, discarding.'
-        if (count ge 1) then prior=mrdfits(input,w[0],header) ; TODO: use header coordinates etc.
-     endif
-  endif else prior=rgl_prio     ; defined in call 
+  if find_prior_img then begin
+     w=where(extname eq rgl_prio, count)
+     if (count gt 1) then print, 'multiple prior images found in input file, discarding.'
+     if (count ge 1) then begin
+        hdu_prior_img=hdunumbers[w[0]]
+        prior=mrdfits(input,hdu_prior_img,prior_img_header) ; TODO: use header coordinates etc.
+        message,/inform,'... found prior image "'+rgl_prio+'" at HDU #'+strtrim(string(hdu_prior_img),2)
+     endif else find_prior_img = 0
+  endif
 
-;target: if not defined, take first one. If defined, find index, and
+;; input file read complete. Overwrite values with passed values if any:
+
+  if doinit_img then begin
+     find_init_img = 0 ; since it's going to be replaced
+     ; if passed_init_img is a string, read it as fits. Else check it is a 2d array
+     sz = size(passed_init_img) & nsz = N_ELEMENTS(sz) & typesz = sz[nsz-2]  
+     if (typesz eq 7) then begin 
+        guess=mrdfits(passed_init_img,0,init_img_header)
+        init_img=FILE_BASENAME(passed_init_img) ; remove potentially harmful long dirname
+        message,/inform,'... using external fits file "'+init_img+'" as init image' 
+     endif else begin 
+        guess=passed_init_img   ; a passed 2d array.
+        init_img="internal_image"
+        message,/inform,"... using passed array as init image" 
+     endelse
+  endif
+
+  if dorgl_prio then begin
+     find_prior_impg = 0
+     ; if prior is a string, read it as fits. Else check it is a 2d array
+     sz = size(passed_rgl_prio) & nsz = N_ELEMENTS(sz) & typesz = sz[nsz-2]  
+     if (typesz eq 7) then begin 
+        prior=mrdfits(passed_rgl_prio,0,rgl_prio_header)
+        rgl_prio=FILE_BASENAME(rgl_prio) ; remove potentially harmful long dirname
+        message,/inform,'... using external fits file "'+rgl_prio+'" as prior' 
+     endif else begin 
+        prior=passed_rgl_prio          ; a passed 2d array.
+        rgl_prio="internal_image"
+        message,/inform,"... using passed array as prior" 
+     endelse
+  endif
+
+
+  if dotarget    then target=passed_target
+  if dothreshold then threshold=double(passed_threshold); convergence threshold
+  if donbiter    then nbiter=fix(passed_nbiter) ; number of iterations.
+  if dofov       then fov = double(passed_fov) ; Field of View of reconstructed image (14*14 marcsec^2 here)
+  if donp_min    then np_min = fix(passed_np_min) ; width of reconstructed image in pixels (same along x and y axis).
+  if doregul     then begin ; L1L2 by default
+      w=where(strtrim(strupcase(regul_name),2) eq passed_regul, count) ; regul is a name here
+      if count lt 1 then regul=default_regul else regul=w[0]    ; regul is now an integer: 0:totvar, 1:psd, 2:l1l2, 3:l1l2_white, 4:support 
+  endif
+
+  if (dowaverange) then begin
+     type = SIZE(waverange, /TYPE)
+     if (type eq 7) then result=execute('waverange='+waverange) ; to convert string to array
+     wave_min=waverange[0]*1D-6
+     wave_max=waverange[1]*1D-6
+  endif
+
+  message,/informational,"Using Regularization: "+regul_name[regul]
+
+; if guess is a cube, take 1st plane
+  if ((size(guess))[0] gt 2) then guess=guess[*,*,0,0,0,0,0]
+
+
+;target: if still not defined, take first one. If defined, find index, and
 ;error if target not found:
   if (target eq "*") then begin
      target=strtrim(oitarget[0].target,2)
@@ -266,11 +373,15 @@ if ((size(guess))[0] gt 2) then guess=guess[*,*,0,0,0,0,0]
   endif else begin
      targets=strtrim(oitarget.target,2)
      w=where(targets eq target, count)
-     if (count lt 1) then message,"ERROR: target not found in input file, exiting."
+     if (count lt 1) then begin
+        message,/inform,'ERROR: target "'+target+'" not found in input file.'
+        if (~(wisard_is_interactive)) then exit else return
+     endif
      target_id=oitarget[w[0]].target_id
      raep0=oitarget[w[0]].raep0
      decep0=oitarget[w[0]].decep0
   endelse
+
 ; warn (for the time being) that a complicated OIFITS is not pruned at
 ; output by the choice of only one object: 
 if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output file will contain more HDUs than the selected target's ones."
@@ -286,33 +397,54 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
   for i=0,n_elements(oit3arr)-1 do t3inst[i]=(where(sxpar(*oit3headarr[i],"INSNAME") eq allinsnames))[0]
 
 ; all values defined,  get new data structure
-  newdata=wisard_oifits2data(input,targetname=target,_extra=ex)
-; create list of non-void data = list of configurations
-  configlist=where(ptr_valid(newdata))
-
+  masterDataArray=wisard_oifits2data(input,targetname=target,_extra=ex)
+; drop void data in masterData 
+  www=where(ptr_valid(masterDataArray),numberOfConfigurations)
+  masterDataArray=masterDataArray[www]
+; individually check an trim each data structure
+  someDataIsAvailable=0
+  someRangeIsAvailable=(wave_min eq wave_max) ; 1 if we do not select any wave range.
+; total data wavelength range: compute, intializing to some good
+; value:
+  total_wave_min=min((*masterDataArray[0]).wlen)
+  total_wave_max=max((*masterDataArray[0]).wlen)
 ; use last (greatest number of baselines) not to break compatibility
-  data=*newdata[configlist[-1]]
-
+  for idata=0,numberOfConfigurations-1 do begin
+     data=*masterDataArray[idata]
+     
 ; there must be some data left to work with
-  if (~finite(total(data.vis2err)) || ~finite(total(data.cloterr))) then message,"ERROR: Only Flagged Data Available, Aborting."
-
-  doWaveSubset=0
+     if ( total(data.vis2err,/nan) ne 0 && total(data.cloterr,/nan) ne 0 ) then someDataIsAvailable++
+     
 ; simple wavelength selection. If selection is >= min max range, no
-; subset is really asked for.
-  if (wave_min lt wave_max) then begin ; which have probaly been read in input file
-     w=where(data.wlen lt wave_min or data.wlen gt wave_max, count)
-     if count gt 0 then begin ; there is indeed a subset asked!
-        doWaveSubset=1
-        w=where(data.wlen ge wave_min and data.wlen le wave_max, count)
-        if count lt 1 then message,"ERROR: invalid wavelength range, exiting. (request is probably smaller than a single instrument channel?)"
-        data = data[w]
-     endif
-  end else begin                ; set values of wave_min and max to used values:
-     wave_min = min(data.wlen)
-     wave_max = max(data.wlen)
-  end
-  waveSubset=[wave_min,wave_max]
+; subset is really asked for. wave_min==wave_mask==-1 if no range has
+; been asked for.
+     if (wave_min lt wave_max) then begin ; which have probaly been read in input file
+        w=where(data.wlen lt wave_min or data.wlen gt wave_max, count)
+        if count gt 0 then begin ; there is indeed a subset asked!
+           w=where(data.wlen ge wave_min and data.wlen le wave_max, count)
+           if count gt 0 then begin
+              data = data[w]
+              masterDataArray[idata]=PTR_NEW(data)
+              someRangeIsAvailable++
+           endif
+        endif
+     endif else begin
+        total_wave_min=min([total_wave_min,data.wlen])        
+        total_wave_max=max([total_wave_max,data.wlen])        
+     endelse
+  endfor
 
+
+  if ( ~someDataIsAvailable) then message,"ERROR: Only Flagged Data Available, Aborting."
+  if ( ~someRangeIsAvailable) then message,"ERROR: no data found within requested wavelength range, Aborting. (request is probably smaller than a single instrument channel?)"
+
+; if wave_min,max is still defaulting to -1, use total wavelength values:
+  if (wave_min eq wave_max) then begin
+     wave_min=total_wave_min
+     wave_max=total_wave_max
+  end
+
+;TBC AS THERE MAY BE MORE THAN 1 ARRAY NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ; update fov to be no greater than max fov given by telescope diameter
 ; and lambad_min
 maxfov=(1.22*wave_min/((*(oiarrayarr[0])).diameter)[0])*180*3600.*1000./!DPI
@@ -321,11 +453,31 @@ if (fov gt maxfov or fov le 0) then begin
    fov=maxfov
 end 
 
+; format some help/debug line
+ commandline='Line equivalent of your command: wisardgui,/display,"'+input+'","'+output+'",target="'+target+'",threshold='+strtrim(string(threshold),2)+',nbiter='+strtrim(string(nbiter),2)+',fov='+strtrim(string(fov),2)+',np_min='+strtrim(string(np_min),2)+',regul="'+regul_name[regul]+'",waverange=['+strtrim(string(wave_min*1E6),2)+','+strtrim(string(wave_max*1E6),2)+']'
+ if (doinit_img) then commandline+='",init_img="'+init_img
+ if (dorgl_prio) then commandline+='",rgl_prio="'+rgl_prio+'"'
+ if (doScale) then commandline+=',scale='+strtrim(string(scale),2)
+ if (doDelta) then commandline+=',delta='+strtrim(string(delta),2)
+  print,commandline
+
 ; start reconstruction. TODO case wrt rgl_name/prior
+; TOTVAR is just delta=very_small. 
   case regul of
-     0: reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, AUX_OUTPUT = aux_output, /TOTVAR, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex) 
-     
+
+     0: begin
+        if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
+        if (~doDelta) then delta = 1D
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
+     end
+
      1: begin
+        if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
+        if (~doDelta) then delta = 1D
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
+     end
+
+     2: begin
 ; if regul == 1 (psd) if no prior given, create the PSD of the documentation:
         if n_elements(prior) gt 1 then begin ; take centered ft or prior image as PSD
            psd=abs(shift(fft(prior),(size(prior))[1:2]/2+1))
@@ -333,73 +485,27 @@ end
            distance = double(shift(dist(np_min),np_min/2,np_min/2))
            psd = 1D/((distance^3 > 1D) < 1D6)
         endelse
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
-     end
-
-     2: begin
-        scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
-        delta = 1D
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
      end
 
      3: begin
-        scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
-        delta = 1D
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
-     end
-
-     4: begin
         if ~n_elements(fwhm) then fwhm=10                  ; pixels
         if ~n_elements(mu_support) then mu_support=10.0    ; why not?
-        reconstruction = WISARD(data, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
      end
      
      else: message,"ERROR: regularization not yet supported, FIXME!"
   endcase
 
-; prepare output HDU
-  FXADDPAR,outhead,'XTENSION','BINTABLE'
-  FXADDPAR,outhead,'EXTNAME','IMAGE-OI INPUT PARAM'
-  FXADDPAR,outhead,'TARGET',target
-  FXADDPAR,outhead,'WAVE_MIN',wave_min
-  FXADDPAR,outhead,'WAVE_MAX',wave_max
-  FXADDPAR,outhead,'USE_VIS', 'NONE'
-  FXADDPAR,outhead,'USE_VIS2','T'
-  FXADDPAR,outhead,'USE_T3', 'ALL'
-  if (n_elements(init_img) gt 0) then FXADDPAR,outhead,'INIT_IMG',init_img ; the init image file passed
-  FXADDPAR,outhead,'MAXITER',nbiter
-  FXADDPAR,outhead,'RGL_NAME',regul_name[regul]
-  if (n_elements(scale) gt 0 ) then FXADDPAR,outhead,'SCALE',scale
-  if (n_elements(delta) gt 0 ) then FXADDPAR,outhead,'DELTA',delta
-  FXADDPAR,outhead,'THRESHOL',threshold
-  FXADDPAR,outhead,'NP_MIN',np_min
-  FXADDPAR,outhead,'OVERSAMP',oversampling
-  FXADDPAR,outhead,'FOV',fov,'Field of View (mas)'
-
-; add correct values to images headers
-  sz=size(aux_output.guess)
-  nx=sz[1]
-  ny=sz[2]
-  if (n_elements(init_img) gt 0) then FXADDPAR,imagehead,'EXTNAME',init_img else FXADDPAR,imagehead,'EXTNAME','wisard_initimage'
-  if (n_elements(init_img) gt 0) then FXADDPAR,imagehead,'HDUNAME',init_img else FXADDPAR,imagehead,'HDUNAME','wisard_initimage'
-  FXADDPAR,imagehead,'CTYPE1','RA---SIN'
-  FXADDPAR,imagehead,'CTYPE2','DEC--SIN'
-  FXADDPAR,imagehead,'CRPIX1',nx/2
-  FXADDPAR,imagehead,'CRPIX2',ny/2
-  FXADDPAR,imagehead,'CROTA1',0.0
-  FXADDPAR,imagehead,'CROTA2',0.0
-  FXADDPAR,imagehead,'CRVAL1',raep0
-  FXADDPAR,imagehead,'CRVAL2',decep0
-  FXADDPAR,imagehead,'CDELT1',fov/3600./1000D/nx
-  FXADDPAR,imagehead,'CDELT2',fov/3600./1000D/ny
-  FXADDPAR,imagehead,'CUNIT1','deg'
-  FXADDPAR,imagehead,'CUNIT2','deg'
-  FXADDPAR,imagehead,'EQUINOX',2000.0
-;main header: the reconstructed image
+; main header: the reconstructed image. always present.
   sz=size(aux_output.x)
   nx=sz[1]
   ny=sz[2]
-  FXADDPAR,main_header,'HDUNAME','wisard_image'
+  snp=strtrim(string(np_min),2)
+  sit=strtrim(string(aux_output.iter),2)
+
+  reconstructed_image_hduname=target+'_'+snp+'x'+snp+'_'+sit
+  FXADDPAR,main_header,'HDUNAME',reconstructed_image_hduname
   FXADDPAR,main_header,'CTYPE1','RA---SIN'
   FXADDPAR,main_header,'CTYPE2','DEC--SIN'
   FXADDPAR,main_header,'CRPIX1',nx/2
@@ -413,13 +519,55 @@ end
   FXADDPAR,main_header,'CUNIT1','deg'
   FXADDPAR,main_header,'CUNIT2','deg'
   FXADDPAR,main_header,'EQUINOX',2000.0
-
-; write output file. Put output image in main header!
+; initialize output file. Put output image in main header!
   mwrfits,aux_output.x,output,main_header,/create,/silent,/no_copy,/no_comment
-; create a dummy structure to make mwrfits write a binary extension
-  dummystruct={DUMMY: 0.0d}
-  mwrfits,dummystruct,output,outhead,/silent,/no_copy,/no_comment
-  mwrfits,aux_output.guess,output,imagehead,/silent,/no_copy,/no_comment
+
+; output parameters. always present.
+  FXADDPAR,ouput_params_header,'XTENSION','BINTABLE'
+  FXADDPAR,ouput_params_header,'EXTNAME','IMAGE-OI OUTPUT PARAM'
+  FXADDPAR,ouput_params_header,'TARGET',target
+  FXADDPAR,ouput_params_header,'WAVE_MIN',wave_min
+  FXADDPAR,ouput_params_header,'WAVE_MAX',wave_max
+  FXADDPAR,ouput_params_header,'LAST_IMG',reconstructed_image_hduname
+  FXADDPAR,ouput_params_header,'MAXITER',nbiter
+  FXADDPAR,ouput_params_header,'RGL_NAME',regul_name[regul]
+  FXADDPAR,ouput_params_header,'SCALE',scale
+  FXADDPAR,ouput_params_header,'DELTA',delta
+  FXADDPAR,ouput_params_header,'THRESHOL',threshold
+  FXADDPAR,ouput_params_header,'NP_MIN',np_min
+  FXADDPAR,ouput_params_header,'FOV',fov,'Field of View (mas)'
+
+  dummystruct={DUMMY: 0.0d}; we need a dummy structure to make mwrfits write a binary extension
+  mwrfits,dummystruct,output,ouput_params_header,/silent,/no_copy,/no_comment
+
+; input params only if there was an image inside. In which case we
+; copy the initial image too, under its initial name
+  if find_init_img then begin
+     mwrfits,{aaa:0.0},output,input_params_header,/silent,/no_copy,/no_comment
+
+; reinterpret input parameters and add correct values to images headers
+     
+     sz=size(aux_output.guess)
+     nx=sz[1]
+     ny=sz[2]
+     FXADDPAR,init_image_header,'EXTNAME','INITIAL_IMAGE'
+     FXADDPAR,init_image_header,'HDUNAME',init_img
+     FXADDPAR,init_image_header,'CTYPE1','RA---SIN'
+     FXADDPAR,init_image_header,'CTYPE2','DEC--SIN'
+     FXADDPAR,init_image_header,'CRPIX1',nx/2
+     FXADDPAR,init_image_header,'CRPIX2',ny/2
+     FXADDPAR,init_image_header,'CROTA1',0.0
+     FXADDPAR,init_image_header,'CROTA2',0.0
+     FXADDPAR,init_image_header,'CRVAL1',raep0
+     FXADDPAR,init_image_header,'CRVAL2',decep0
+     FXADDPAR,init_image_header,'CDELT1',fov/3600./1000D/nx
+     FXADDPAR,init_image_header,'CDELT2',fov/3600./1000D/ny
+     FXADDPAR,init_image_header,'CUNIT1','deg'
+     FXADDPAR,init_image_header,'CUNIT2','deg'
+     FXADDPAR,init_image_header,'EQUINOX',2000.0
+     mwrfits,aux_output.guess,output,init_image_header,/silent,/no_copy,/no_comment
+
+  endif
 
   mwrfits,oitarget,output,targethead,/silent,/no_copy,/no_comment
 
@@ -436,10 +584,14 @@ end
 ; wavelengths or wavelength subsets.
   for i=0,n_elements(oivis2arr)-1 do begin
      outhead=*oivis2headarr[i]
+
+
+     doWaveSubset=0
 ; note: the doWaveSubset trick is not correctly implemented in the
 ; subroutine and is temporarily ignored if fact. Meaning that the
 ; model visibility will be forced in ALL wavelengths, not only the
 ; ones that were used.
+
      if (doWaveSubset) then begin
         vis2subset=add_model_oivis2( *oivis2arr[i] , *oiwavearr[vis2inst[i]], aux_output, outhead, use_target=target_id, wsubs=waveSubset, operators=aux_output.operators)
      endif else begin
@@ -484,9 +636,7 @@ end
      endif
   endfor
 
-
-
-  if (~n_elements(interactive)) then begin
+  if (~(wisard_is_interactive)) then begin
     print,'----------------ACKNOWLEDGEMENTS------------------------------'
     print,"If WISARD was helpful for your research, please add this sentence in the acknowledgement section of your articles:"
     print,"``This research has made use of the Jean-Marie Mariotti Center \textsc{WISARD} image reconstruction utility \footnote{Available at http://www.jmmc.fr/wisard}.''"
@@ -494,5 +644,5 @@ end
     print,' (1) S. Meimon, L. M. Mugnier, and G. Le Besnerais, "Self-calibration approach for optical long-baseline interferometry imaging", J. Opt. Soc. Am. A, 26(1):108-120, 2009.'
     print,' (2) S. Meimon, L. M. Mugnier and G. Le Besnerais,``A convex approximation of the likelihood in optical interferometry'', J. Opt. Soc. Am. A (November 2005).'
      exit,status=0
-  endif
+  endif else if doreconstructed_img then reconstructed_img=aux_output.x 
 end
