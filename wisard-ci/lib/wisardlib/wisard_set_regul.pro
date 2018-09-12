@@ -241,7 +241,6 @@ FUNCTION WISARD_SET_REGUL, PSD = psd, MEAN_O = mean_o, $
                            MU_SUPPORT = mu_support, FWHM = fwhm, $
                            NP = NP, $
                            POSITIVITY = positivity, $
-                           TOTVAR = totvar, $
                            VERSION = version, HELP = help
 
 on_error,2
@@ -339,9 +338,7 @@ ENDIF ELSE IF keyword_set(mu_support) THEN BEGIN ; regularization by soft suppor
    prior = {type: 'softsupport', mu_support: mu_support, $
             mean_o: mean_o_inside, $  ;fwhm: fwhm inutile apres calcul mean_o 
             positivity: (positivity_inside NE 0), NP: NP, squareNP: squareNP } 
-ENDIF ELSE IF keyword_set(totvar) THEN BEGIN ; regularization by totvar
-   
-   prior = {type: 'totvar', positivity: (positivity_inside NE 0), NP: NP, squareNP: squareNP } 
+
 ENDIF ELSE $
     prior = {type: 'none', $
              positivity: (positivity_inside NE 0), NP: NP, squareNP: squareNP }

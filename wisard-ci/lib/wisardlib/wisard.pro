@@ -54,7 +54,7 @@
 ; (3) L. M. Mugnier, G. Le Besnerais, and S. Meimon, 
 ;   "Inversion in optical imaging through atmospheric turbulence", 
 ;   chapter 10 of Bayesian Approach for Inverse Problems, 
-;   edited by Jerome Idier, ISTE, London, 2008.
+;   edited by Jerome Idier, ISTE, London, 2008. 
 ;
   
 
@@ -74,8 +74,7 @@
 ;                            NBITER = nbiter, THRESHOLD = threshold, $
 ;                            POSITIVITY = positivity, $
 ;                            PSD = psd, MEAN_O = mean_o,
-;                            DELTA = delta, SCALE = scale, WHITE =
-;                            white, TOTVAR=TOTVAR, $
+;                            DELTA = delta, SCALE = scale, WHITE = white, $
 ;                            MU_SUPPORT = mu_support, FWHM = fwhm, $
 ;                            LIBRARY = library, $ $
 ;                            AUX_OUTPUT = aux_output, DISPLAY = display, $
@@ -316,7 +315,7 @@
 ;   (3) L. M. Mugnier, G. Le Besnerais, and S. Meimon, 
 ;   "Inversion in optical imaging through atmospheric turbulence", 
 ;   chapter 10 of Bayesian Approach for Inverse Problems, 
-;   edited by J�r�me Idier, ISTE, London, 2008.
+;   edited by Jerome Idier, ISTE, London, 2008.
 ;
 ; EXAMPLE:
 ;	See example batch file in the pro/ directory. 
@@ -330,12 +329,12 @@
 ;   The authors of WISARD hereby express their gratefulness to the following
 ;   good guys ;-) :
 ;   
-;   �ric Thi�baut:
-;   WISARD heavily uses OptimPack (by �ric Thi�baut, from CRAL) as its (neat)
+;   Eric Thiebaut:
+;   WISARD heavily uses OptimPack (by Eric Thiebaut, from CRAL) as its (neat)
 ;   minimization engine. WISARD assumes that the OptimPack library and its IDL
 ;   frontend (op_*.pro files) are properly installed on your machine.
 ;
-;   Fr�d�ric Cassaing, Jean-Marc Conan and Jean-Fran�ois Sauvage:
+;   Frederic Cassaing, Jean-Marc Conan and Jean-Francois Sauvage:
 ;   WISARD uses a few routines by these ONERA scientists. These routines (and
 ;   some others by Laurent Mugnier) are distributed along with WISARD,
 ;   with these authors' permissions, in the lib/oneralib/ directory.
@@ -345,6 +344,14 @@
 ;   http://idlastro.gsfc.nasa.gov/). 
 ;   
 ; HISTORY:
+;   Version JMMC 2018 for OImaging:
+;   Made by G. Duvert
+;   modification du code pour accepter simultanément plusieurs configurations
+;   (observation simultanées à 3...N telescopes). En utilisant le fait qu'on peut les
+;   mettre dans un seule structure a N telescopes si on prend soin de mettre weight=0
+;   pour les elements de la structure qui n'ont pas de contrepartie quand le nombre de
+;   telsecopes est inferieur a N.
+; 
 ;   Revision 3.3, branche _flag_to_weight0:
 ;   * les infos de flag ne sont pas transmises pour la minimisation 
 ;   (à wisard_j*, à travers fmin_op), mais les flags "bad" sont traduits en weight=0
@@ -407,12 +414,13 @@
 ;   plot_fit module added
 ;
 ;   Revision 0.8  2007/01/19 17:53:07  mugnier
-;   Am�liorations affichage.
+;   Ameliorations affichage.
 ;
 ;   Revision 0.7  2007/01/19 13:00:35  mugnier
-;   On sauve le guess d'initialisation, si besoin r��chantillonn� et seuill� � 0
-;   dans AUX_OUTPUT (et ce guess est la dirty map seuill�e � 0 s'il n'est pas
-;   pass� en argument).
+;   On sauve le guess d'initialisation, si besoin
+;   reechantillonne et seuille a 0
+;   dans AUX_OUTPUT (et ce guess est la dirty map seuillee a zero s'il n'est pas
+;   passe en argument).
 ;
 ;   Revision 0.6  2007/01/18 17:05:27  mugnier
 ;   On exit, X is reform'ed into a square image.
@@ -423,32 +431,32 @@
 ;   Removed remains of commented code.
 ;
 ;   Revision 0.4  2006/11/09 17:54:56  meimon
-;   arret sur convergence d'un cycle � l'autre
+;   arret sur convergence d'un cycle a l'autre
 ;   joli resultat sur beauty contest 04
 ;
 ;   Revision 0.3  2006/11/07 16:25:43  meimon
 ;   version serge
 ;-
 
-FUNCTION WISARD, data,  $
+FUNCTION WISARD, masterDataArray,  $
                  FOV = fov, NP_MIN = np_min, $
                  OVERSAMPLING = oversampling, $
                  GUESS = guess, VERBOSE_TEST=verbose_test, $
                  NBITER = nbiter, THRESHOLD = threshold, $
                  POSITIVITY = positivity, $
                  PSD = psd, MEAN_O = mean_o, $
-                 DELTA = delta, SCALE = scale, WHITE = white, TOTVAR=TOTVAR, $
+                 DELTA = delta, SCALE = scale, WHITE = white, $
                  MU_SUPPORT = mu_support, FWHM = fwhm, $
                  LIBRARY = library, $
                  AUX_OUTPUT = aux_output, CHI2CRIT = chi2crit, $
                  DISPLAY = display, LUT = lut, $ 
                  VERSION = version, HELP = help, $
-                 COPYRIGHT = copyright, PRINT_TIMES=print_times, USE_FLAGGED_DATA=use_flagged_data, DEBUG=debug,_EXTRA=ex
+                 COPYRIGHT = copyright, USE_FLAGGED_DATA=use_flagged_data, DEBUG=debug, _EXTRA=ex
   
-  ;; for tests: 
+ ;; for tests: 
    t_fminop=0d;
-  
-  on_error,2
+
+;  on_error,2
   IF keyword_set(version) THEN $
      printf, -2, '% WISARD: $Revision: 3.2 $, $Date: 2008/09/11 13:57:17 $'
 
@@ -484,116 +492,135 @@ FUNCTION WISARD, data,  $
         loadct, lut
   ENDIF
   
-  if keyword_set(print_times) then t=SYSTIME(/SECONDS )
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; FABRICATION DONNEES COMPLEXES MYOPES et matrice H
-  mdata = WISARD_DATA2MDATA(data, OPERATORS = operators, VERSION = version,_EXTRA=ex)
-  cmdata = WISARD_MDATA2CMDATA(mdata, OPERATORS = operators, VERSION = version,_EXTRA=ex)
+;;; --- version multi-configurations ---
+;;;
 
-  matrix_phases=angle(cmdata.vis)
-  clot_from_add_phases=operators.C#matrix_phases
-
-  if keyword_set(print_times) THEN t=SYSTIME(/SECONDS)
-  mult_phasors=multiply_phasors(cmdata.vis,operators.C) ; in wisardlib : 
-  if keyword_set(print_times) THEN print,' Time multiply : ', SYSTIME(/SECONDS )-t
+  nd=n_elements(masterDataArray)
   
-  cloture_from_cmdata=angle(mult_phasors)
-  if keyword_set(print_times) THEN print,' Time angle : ', SYSTIME(/SECONDS )-t
- 
-  vec=cmdata.w_rad              ;
- 
-  IF keyword_set(display) THEN BEGIN
-     IF n_elements(lut) EQ 0 THEN $
-        loadct, 13 $            ; display uses rainbow LUT by default
-     ELSE $
-        loadct, lut
-  ENDIF
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; multi-config: loop on all configs from more to less telescopes,
+;;; force 'less telescopes' cmdata into the data structure with the
+;;; more telescopes, by adding weigth=0 fake data.
+;;;
 
+  iloop=0
+  for dindex=nd-1,0,-1 do begin
+     iloop++
+     data=(*masterDataArray[dindex])
+     
+     mdata = WISARD_DATA2MDATA(data, OPERATORS = operators, VERSION = version,_EXTRA=ex)
 
+     ; save operators for the 1st loop as this is the master operator (max number of telescopes)
+
+     if (iloop) then master_operators=operators
+
+     cmdata = WISARD_MDATA2CMDATA(mdata, OPERATORS = operators, VERSION = version,_EXTRA=ex)
+     
+     cloture_from_data= reform(data.clot, n_elements(data.clot))                                                                                                       
+     cloture_from_cmdata=angle(multiply_phasors(cmdata.vis,operators.C)) & cloture_from_cmdata=reform(cloture_from_cmdata, n_elements(cloture_from_cmdata),/OVERWRITE) 
+     
+     allclots_from_data=(iloop)?cloture_from_data:[allclots_from_data,cloture_from_data]
+     allclots_from_cmdata=(iloop)?cloture_from_cmdata:[allclots_from_cmdata,cloture_from_cmdata]
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Flag indices 
-  median_err=median(data.vis2err)
-  flagvis=(data.vis2flag or (abs(data.vis2) gt 1.+3*median_err) or (data.vis2err le 1e-10) ) 
-  
-  if (~use_flagged_data) then $
-     indx_goodflag=where(((flagvis EQ 0) AND (abs(operators.dagc)#(data.clotflag) EQ 0)), $
-                         n_indx_goodflag, complement=indx_badflag) $
-  else begin
-     n_indx_goodflag=n_elements(flagvis) ;
-     indx_goodflag=indgen(n_indx_goodflag)
-  endelse
+     median_err=median(data.vis2err)
+     flagvis=(data.vis2flag or (abs(data.vis2) gt 1.+3*median_err) or (data.vis2err le 1e-10) ) 
+     
+     if (~use_flagged_data) then $
+        indx_goodflag=where(((flagvis EQ 0) AND (abs(operators.dagc)#(data.clotflag) EQ 0)), $
+                            n_indx_goodflag, complement=indx_badflag) $
+     else begin
+        n_indx_goodflag=n_elements(flagvis) ;
+        indx_goodflag=indgen(n_indx_goodflag)
+     endelse
+     
+     n_indx_badflag=n_elements(flagvis)-n_indx_goodflag 
+     
+     if ((n_indx_badflag GT 0) AND (VERBOSE_TEST)) THEN begin
+        indx_badflag_2d=array_indices(flagvis,indx_badflag) 
+        print, ' abs(cmdata.vis)[indx_badflag] ', (abs(reform((cmdata.vis),n_elements(cmdata.vis))))[indx_badflag]
+        print, n_indx_badflag,' bad-flagged elements' 
+        indx=where((abs(operators.dagc)#(data.clotflag) NE 0),count)
+        print,'   ', count,' from flagged closure.'
+        indx=where((flagvis NE 0),count)
+        print,'   ', count,' from flagged VIS2.'
+     ENDIF
+     
+;; weights set at 0 for all 'bad'flags   
+     if (n_indx_badflag gt 0) then begin 
+        print, format='(%" Setting a null weight on %d bad-flagged data")',n_indx_badflag
+        
+;        w_tan_0=cmdata.w_tan    ; intermediate variable 
+;        w_rad_0=cmdata.w_rad    ; intermediaire variable 
+;        w_rad_0[indx_badflag]=0.
+;        w_tan_0[indx_badflag]=0.
+        cmdata[indx_badflag].w_tan=0.
+        cmdata[indx_badflag].w_rad=0.
+     endif
+     
+     ; create consistent all_cmdata by adding zero spacing fake data.
+     ; desired size is the one of iloop=1
+     
+     if (iloop) then begin
+        all_ntels=operators.n_tels
+        allcmdata=cmdata 
+     endif else begin
+        nadd=n_elements(cmdata)
+        nsubset=n_elements(cmdata[0].vis)
+        fake=allcmdata[0]
+;        for i=0,n_tags(fake)-1 do fake.(i)*=0.0
+        fake.w_rad = 0.
+        fake.w_tan = 0.
+        fake_cmdata=replicate(fake,nadd)
+                                ; insert actual cmdata as subset:
+        for j=0,nadd-1 do for i=0,n_tags(fake_cmdata)-1 do fake_cmdata[j].(i)=cmdata[j].(i)
+                                ; concatenate
+        allcmdata=[allcmdata,fake_cmdata]
+     endelse
 
-  n_indx_badflag=n_elements(flagvis)-n_indx_goodflag 
-  
-  if ((n_indx_badflag GT 0) AND (VERBOSE_TEST)) THEN begin
-     indx_badflag_2d=array_indices(flagvis,indx_badflag) 
-     print, ' abs(cmdata.vis)[indx_badflag] ', (abs(reform((cmdata.vis),n_elements(cmdata.vis))))[indx_badflag]
-     print, n_indx_badflag,' bad-flagged elements' 
-     indx=where((abs(operators.dagc)#(data.clotflag) NE 0),count)
-     print,'   ', count,' from flagged closure.'
-     indx=where((flagvis NE 0),count)
-     print,'   ', count,' from flagged VIS2.'
-  ENDIF
-  if keyword_set(print_times) then begin
-     print,' Time INIT: (c)mdata, flags : ', SYSTIME(/SECONDS )-t
-     t=SYSTIME(/SECONDS)
-  endif
+     freqs_u=reform(allcmdata.freqs_u, master_operators.n_bases*n_elements(allcmdata))  
+     freqs_v=reform(allcmdata.freqs_v, master_operators.n_bases*n_elements(allcmdata))
+  endfor
 
+; temporary rename to avoid retyping
+  cmdata=allcmdata
+  operators=master_operators
 ;
-  freqs_u=reform(cmdata.freqs_u, operators.n_bases*n_elements(mdata))  
-  freqs_v=reform(cmdata.freqs_v, operators.n_bases*n_elements(mdata))
   H=WISARD_MAKE_H(FREQS_U=freqs_u, FREQS_V=freqs_v,$
                   OVERSAMPLING = oversampling,$
                   FOV = fov, NP_MIN = np_min,$
                   ORIGIN = origin, $ 
                   NP_OUTPUT = NP, STEP_OUTPUT = step_output, /verbose, VERSION = version)
                       
-  if keyword_set(print_times) then begin 
-     print,' Time INIT: H : ', SYSTIME(/SECONDS )-t
-     t=SYSTIME(/SECONDS)
-  endif
-  
+;;; DROP THIS FOR THE TIME BEING! ;;;;  
 ;;;;;;;;;;Rebuild in case NT=3, to avoid integer ambiguities
-  IF ((operators.n_tels EQ 3) AND (keyword_set(guess))) THEN BEGIN
-     print, '3T case'
-     IF keyword_set(guess) THEN nguess = congrid(guess, NP, NP)  > 0
-     mdata = WISARD_DATA2MDATA(data, OPERATORS = operators, MATH = H, guess = nguess, VERSION = version)
-     cmdata = WISARD_MDATA2CMDATA(mdata, OPERATORS = operators, VERSION = version)   
-     if keyword_set(print_times) then print,' Time INIT: (c)mdata for 3T case : ', SYSTIME(/SECONDS )-t
-  ENDIF
-  
-  t=SYSTIME(/SECONDS)
+;;;  IF ((operators.n_tels EQ 3) AND (n_elements(guess) gt 0 )) THEN BEGIN
+;;;     print, '3T case'
+;;;     IF n_elements(guess) gt 0 THEN nguess = congrid(guess, NP, NP,/center,/interp)  > 0
+;;;     mdata = WISARD_DATA2MDATA(data, OPERATORS = operators, MATH = H, guess = nguess, VERSION = version)
+;;;     cmdata = WISARD_MDATA2CMDATA(mdata, OPERATORS = operators, VERSION = version)  
+;;;  ENDIF
 
-;; weights set at 0 for all 'bad'flags   
-  if (n_indx_badflag gt 0) then begin 
-     print, format='(%" Setting a null weight on %d bad-flagged data")',n_indx_badflag
-     
-     w_tan_0=cmdata.w_tan       ; intermediate variable 
-     w_rad_0=cmdata.w_rad       ; intermediaire variable 
-     w_tan_0[indx_badflag]=(w_rad_0[indx_badflag]=0.)
-     cmdata.w_tan=w_tan_0
-     cmdata.w_rad=w_rad_0 
-  endif
   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; INITIALISATIONS
-
 ; Initialisation of default object: dirty map, or guess if given, with positivity
-  IF keyword_set(guess) THEN BEGIN
-     nguess = congrid(guess, NP, NP)  > 0 ; matrice guess redimenssionnee a NPxNP
+  IF (size(guess))[0] gt 1 THEN BEGIN
+; recenter guess is mandatory
+     guess=wisard_recenter(guess)
+     toto=[2,NP,NP]
+     if (total((size(guess))[0:2] eq toto) eq 3) then nguess=guess > 0 else nguess = congrid(guess, NP, NP)  > 0 ; matrice guess redimenssionnee a NPxNP
   ENDIF  ELSE BEGIN
 ; inverse FT of myopic complex visibilities:
-     if (verbose_test) then t0=systime(1)
-     if (verbose_test) then print, "dirty map memory at start: ",memory(/current)
      dirty_map=0
      a=(conj(H))[indx_goodflag,*]
      b=(reform(cmdata.vis,(size(H))[1]))[indx_goodflag]
      dirty_map=matrix_multiply(a,b,/ATRANSPOSE)
      a=0
      b=0
-     if (verbose_test) then print,'time making dirty map:', systime(1)-t0
-     if (verbose_test) then print, "memory at end: ",memory(/current)
-     nguess = real(dirty_map, VERSION = version) > 0
+     nguess = reform(real(dirty_map, VERSION = version),NP,NP) > 0
   ENDELSE
   nguess = nguess/total(nguess) ; saved in aux_output.
   x = reform(nguess, n_elements(nguess))
@@ -625,55 +652,55 @@ FUNCTION WISARD, data,  $
   rad_freqs = reform(sqrt(abs2(cmdata.freqs_u)+abs2(cmdata.freqs_v)), $
                      operators.n_bases*n_elements(cmdata))
   clot_freqs=cmdata_clot_maxfrequency(cmdata)
-
-  if keyword_set(debug) then begin 
-
-;;;;;;;;;;;;;
-;; plot of V2 from data and from myopic convex estimate
-     window, display+3, xs = 512, ys = 512, $
-             title = !PROMPT+nbr2str(display)+': original and myopic vis.'  
-     wset, display+3
-     RAD_FREQS = rad_freqs                                     ;
-     ABS_VIS2 = reform(sqrt(abs(data.vis2)), n_elements(data.vis2)) ;
-     ABS_Y = reform(weights_constant.abs_y_data, n_elements(ABS_VIS2))
-     INV_SIGMA_RAD = reform(sqrt(abs(data.vis2))*0.0, n_elements(ABS_VIS2))
-
-     xtitle =  'frequency'      ; textoidl('|\nu|') 
-     ytitle = 'VIS.'
-     xmax=max(rad_freqs)*1.05D
-     xmin=0.0D
-
-     !P.MULTI=[0,0,2,0,0]
-     !P.POSITION=[0.05,0.3,0.95,0.95]
-     plot,RAD_FREQS,ABS_VIS2, YRANGE=[0,1], XRANGE = [xmin, xmax], XMARGIN=[10,4], /NODATA ; white, box only
-     oplot,rad_freqs,abs_VIS2,psym=7, color = 150 ; red
-     oplot, rad_freqs, psym=5, reform(mdata.visamp,n_elements(ABS_VIS2)), color=60
-     oplot,rad_freqs,abs_y,psym=6,color = 100 ;green
-
-     tstring = ['Original sqrt(vis2)', 'Convex (mdata)','Myopic convex (cmdata)']
-     tlinestyle= [0,0,0]        ;
-     tsym= [7, 5, 6]
-     wis_legend, tstring, line = tlinestyle, psym = tsym, color = [150,60,100], /top, $
-                 /right, clear = clear
-     !P.MULTI=0
-     !P.POSITION=0
-  endif
   
+  IF keyword_set(display) THEN BEGIN
+     IF n_elements(lut) EQ 0 THEN  loadct, 13 ELSE loadct, lut            ; display uses rainbow LUT by default
 
+;;;     if keyword_set(debug) then begin 
+;;;        
+;;;;;;;;;;;;;;;;
+;;;;; plot of V2 from data and from myopic convex estimate
+;;;        window, display+3, xs = 512, ys = 512, $
+;;;                title = !PROMPT+nbr2str(display)+': original and myopic vis.'  
+;;;        wset, display+3
+;;;        RAD_FREQS = rad_freqs                                       ;
+;;;        ABS_VIS2 = reform(sqrt(abs(data.vis2)), n_elements(data.vis2)) ;
+;;;        ABS_Y = reform(weights_constant.abs_y_data, n_elements(ABS_VIS2))
+;;;        INV_SIGMA_RAD = reform(sqrt(abs(data.vis2))*0.0, n_elements(ABS_VIS2))
+;;;        
+;;;        xtitle =  'frequency'   ; textoidl('|\nu|') 
+;;;        ytitle = 'VIS.'
+;;;        xmax=max(rad_freqs)*1.05D
+;;;        xmin=0.0D
+;;;        
+;;;        !P.MULTI=[0,0,2,0,0]
+;;;        !P.POSITION=[0.05,0.3,0.95,0.95]
+;;;        plot,RAD_FREQS,ABS_VIS2, YRANGE=[0,1], XRANGE = [xmin, xmax], XMARGIN=[10,4], /NODATA ; white, box only
+;;;        oplot,rad_freqs,abs_VIS2,psym=7, color = 150                                          ; red
+;;;        oplot, rad_freqs, psym=5, reform(mdata.visamp,n_elements(ABS_VIS2)), color=60
+;;;        oplot,rad_freqs,abs_y,psym=6,color = 100 ;green
+;;;        
+;;;        tstring = ['Original sqrt(vis2)', 'Convex (mdata)','Myopic convex (cmdata)']
+;;;        tlinestyle= [0,0,0]     ;
+;;;        tsym= [7, 5, 6]
+;;;        wis_legend, tstring, line = tlinestyle, psym = tsym, color = [150,60,100], /top, $
+;;;                    /right, clear = clear
+;;;        !P.MULTI=0
+;;;        !P.POSITION=0
+;;;     endif
+
+  ENDIF
+
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; REGULARISATION
   prior = WISARD_SET_REGUL( POSITIVITY = positivity, $
                             PSD = psd, MEAN_O = mean_o, $
                             MU_SUPPORT = mu_support, FWHM = fwhm, $
                             SCALE = scale, DELTA = delta, WHITE = white,  $
-                            TOTVAR = TOTVAR, $
                             NP = NP, VERSION = version)
   IF (prior.positivity NE 0B) THEN active_set = bytarr(prior.squareNP) + 1B
 
-  if keyword_set(print_times) then begin 
-     print,' Time INIT: init x, w, w_constant, H, regul : ', SYSTIME(/SECONDS )-t
-     t=SYSTIME(/SECONDS)
-  endif
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; MAIN LOOP (SELF-CALIBRATION)
   continue = 1B
@@ -695,12 +722,10 @@ FUNCTION WISARD, data,  $
              title = !PROMPT+nbr2str(display+1)+': plot of visibility fit'
   ENDIF
 
-  if keyword_set(print_times) then print, '*** Starting loop'
-
   WHILE ((iter LT nbiter) AND (conv GE epsilon) AND (continue)) DO BEGIN
      
-     if keyword_set(print_times) then t_loop= SYSTIME(/SECONDS ) 
      if (VERBOSE_TEST) THEN print, ' ********* iter : ', iter
+
      old_crit = total(crit_array)
      ;; MIN sur alpha
      ;;maj de weights_x
@@ -709,10 +734,7 @@ FUNCTION WISARD, data,  $
      
      if (VERBOSE_TEST) THEN print, ' rms(map x) : ',stddev(x)
      
-     if keyword_set(print_times) then t= SYSTIME(/SECONDS )
      achix = reform(H#norm_x, operators.n_bases, n_elements(cmdata)) ; TF de norm_x (guess au depart, resultat de boucle ensuite)  
-     if keyword_set(print_times) then print,'  Time: achix orig: ', SYSTIME(/SECONDS )-t
-      
      abs_hx = abs(achix) 
      abs2_hx = abs2(achix)
      arg_hx = angle(achix)
@@ -723,23 +745,20 @@ FUNCTION WISARD, data,  $
      weights_x = {abs_hx:abs_hx, arg_hx:arg_hx, wx1:wx1, wx2:wx2}
      
      IF (display NE 0) THEN BEGIN
-        if keyword_set(print_times) then t= SYSTIME(/SECONDS ) ; t4 
+        mult_phasors=multiply_phasors(achix,operators.C)
+        cloture_from_current_x = angle(mult_phasors) & cloture_from_current_x = reform(cloture_from_current_x, n_elements(cloture_from_current_x),/overwrite)         
+
         wset, display+1
-
-    mult_phasors=multiply_phasors(achix,operators.C)
-    cloture_from_current_x=angle(mult_phasors)          
-
         WISARD_PLOT_FIT, RAD_FREQS = rad_freqs,$ 
                          ABS_HX = reform(abs_hx, n_elements(abs_hx)), $
                          ABS_Y  = reform(weights_constant.abs_y_data, n_elements(abs_hx)), $
                          CLOT_FREQS = clot_freqs,$
-                         CLOT_FROM_DATA = reform(data.clot, n_elements(data.clot)),$
-                         CLOT_FROM_CMDATA = reform(cloture_from_cmdata, n_elements(cloture_from_cmdata)),$
-                         CLOT_FROM_CURR_X = reform(cloture_from_current_x, n_elements(cloture_from_cmdata)),$
+                         CLOT_FROM_DATA = allclots_from_data, $ ;cloture_from_data ,$
+                         CLOT_FROM_CMDATA = allclots_from_cmdata, $ ;cloture_from_cmdata,$
+                         CLOT_FROM_CURR_X = cloture_from_current_x,$
                          INV_SIGMA_RAD = reform(sqrt(cmdata.w_rad),n_elements(abs_hx)), $
                          INDX_BADFLAG=indx_badflag,$ ; uncomment if bad flagged data is to be plotted
                          VERSION = version
-        if keyword_set(print_times) then print,'  Time: Display :',SYSTIME(/SECONDS )-t
      ENDIF
      
      ;;minimization of alpha    
@@ -753,19 +772,16 @@ FUNCTION WISARD, data,  $
               CRIT_ARRAY = crit_array, $
               OPERATORS = operators, CHI2CRIT = chi2crit, VERSION = version
      if keyword_set(print_times) then print,'  Time: FMIN_OP(alpha) : ',SYSTIME(/SECONDS )-t
-     
+
      ;; MIN of x, possibly with positivity constraint   
      
      ; build ph matrix (fast method): 
-     if keyword_set(print_times) then t= SYSTIME(/SECONDS )                                 
      ph=H*(REFORM(EXP(!dI*(operators._B#alpha)),operators.n_bases*n_elements(cmdata),/overwrite)#replicate(1.,n_elements(H[0,*])))
-     if keyword_set(print_times) then print, '  Time: PH=P.H : ',SYSTIME(/SECONDS )-t
      
      ;Use pointers for a faster passage of variables
      weights_alpha = {re_ph:PTR_NEW(real(ph), /NO_COPY), im_ph:PTR_NEW(imaginary(ph), /NO_COPY)}
      
      ;; minimisation over X
-     if keyword_set(print_times) then t= SYSTIME(/SECONDS ) 
      FMIN_OP, x, error, FUNC = 'wisard_jtotal_x', LIBRARY = library, $
               /ALLTHEWAY, CONV_THRESHOLD = epsilon/2D, $
               ITMAX = itmax_x,  $
@@ -774,19 +790,18 @@ FUNCTION WISARD, data,  $
               WEIGHTS_ALPHA = weights_alpha, $
               PRIOR = prior, CRIT_ARRAY = crit_array, $
               OPERATORS = operators, CHI2CRIT = chi2crit, VERSION = version
-                   
+
      if keyword_set(print_times) then BEGIN
       t_fminop=t_fminop+SYSTIME(/SECONDS )-t
       print, '   TIME: FMIN_OP(x) : ',SYSTIME(/SECONDS )-t
       t= SYSTIME(/SECONDS ) 
      endif 
-     
+              
      IF (display NE 0) THEN BEGIN
         wset, display                 
         aff, rotate(reform(x, NP, NP), 5), VERSION = version
      ENDIF
-     if keyword_set(print_times) then print,'Time t8',SYSTIME(/SECONDS )-t
-     
+
      iter = iter+1L
 ; not suitable for use with gui (no terminal, etc).   
 ;     IF (getenv('DISPLAY') NE '') THEN BEGIN 
@@ -795,7 +810,7 @@ FUNCTION WISARD, data,  $
 ;           message, 'interruption of iterations by user.', /INFO
 ;        ENDIF
 ;     ENDIF
-     IF iter GT 2 THEN BEGIN
+     IF iter GE 2 THEN BEGIN
         conv = 2D*(old_crit-total(crit_array))/(old_crit+total(crit_array))
         print,nbr2str(iter, VERSION = version), '/', nbr2str(nbiter), '. Convergence=',  $
               nbr2str(conv, format = '(E25.2)'), $
@@ -805,16 +820,11 @@ FUNCTION WISARD, data,  $
 ;              nbr2str(total(crit_array[0])/(2*n_elements(cmdata)), format = '(F25.4)'), ' + ', $
               nbr2str(total(crit_array[1]), format = '(F25.4)')
      ENDIF
-     if keyword_set(print_times) then print,'Total time for iteration : ',SYSTIME(/SECONDS )-t_loop
-     
+  
   ENDWHILE
-
-
-  if keyword_set(print_times) then print,' Total time fminop : ',t_fminop
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; POST-PROCESSING
-  if keyword_set(print_times) then t=SYSTIME(/SECONDS)
   
   factor = 1D/total(x)
 ; print,  'factor', factor
@@ -835,22 +845,20 @@ FUNCTION WISARD, data,  $
                          ABS_HX = reform(abs_hx, n_elements(abs_hx)), $
                          ABS_Y  = reform(weights_constant.abs_y_data, n_elements(abs_hx)), $
                          CLOT_FREQS = clot_freqs,$
-                         CLOT_FROM_DATA = reform(data.clot, n_elements(data.clot)),$
-                         CLOT_FROM_CMDATA = reform(cloture_from_cmdata, n_elements(cloture_from_cmdata)),$
-                         CLOT_FROM_CURR_X = reform(cloture_from_current_x, n_elements(cloture_from_cmdata)),$
+                         CLOT_FROM_DATA = cloture_from_data,$
+                         CLOT_FROM_CMDATA = cloture_from_cmdata,$
+                         CLOT_FROM_CURR_X = cloture_from_current_x,$
                          INV_SIGMA_RAD = reform(sqrt(cmdata.w_rad),n_elements(abs_hx)), $
                          INDX_BADFLAG=indx_badflag,$ ; uncomment if bad flagged data is to be plotted
                          VERSION = version
   ENDIF
 
   norm_x = reform(norm_x, prior.np, prior.np)
-  aux_output= {fov: fov, nbiter:nbiter, guess:nguess, np_min:np_min, resolution:fov/np_min, cmdata:cmdata, prior:prior, crit_array:crit_array, $
+  aux_output= {fov: fov, iter:iter, nbiter:nbiter, guess:nguess, np_min:np_min, resolution:fov/np_min, cmdata:cmdata, prior:prior, crit_array:crit_array, $
                                               x:norm_x, alpha:alpha, $
                                                operators:operators, weights_constant:weights_constant, $
                                                weights_alpha:weights_alpha, weights_x:weights_x, $
                                                rad_freqs:rad_freqs}
   
-  if keyword_set(print_times) then print,' Time: Post-processing : ',SYSTIME(/SECONDS )-t
-
   return, norm_x
 END

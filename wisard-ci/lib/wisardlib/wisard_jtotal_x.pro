@@ -214,23 +214,19 @@ ENDIF ELSE IF (prior.type EQ 'softsupport') THEN BEGIN
    crit_array[1] = J_PRIOR_SUPPORT(reform(norm_x, prior.NP,prior.NP) , GRADIENT_O = gradient_prior, $
                                    MU = prior.mu_support, MEAN_O = prior.mean_o, VERSION = version) 
    IF (n_params() EQ 2) THEN norm_gradient_prior = reform(gradient_prior, prior.squareNP)
-ENDIF ELSE IF (prior.type EQ 'totvar') THEN BEGIN 
-   crit_array[1] = J_PRIOR_TOTVAR(reform(norm_x, prior.NP,prior.NP) , GRADIENT_O = gradient_prior, $
-                                  VERSION = version) 
-   IF (n_params() EQ 2) THEN norm_gradient_prior = dblarr( prior.squareNP) ; //do nothing
 ENDIF ELSE crit_array[1] = 0D
 
 if (print_times) THEN print,'   > wisard_jtotal_x : crit_array[regularisation]',SYSTIME(/SECONDS )-t
 
-IF (n_params() EQ 2) THEN BEGIN
-   norm_gradient = gradient_data+norm_gradient_prior
-   gradient = factor*(norm_gradient-total(norm_x*norm_gradient))
-ENDIF
 
 ;print, crit_array
 IF keyword_set(chi2crit) THEN mult = 1./n_elements(*weights_constant.re_y_data) ELSE mult = 1.
 crit_array = crit_array*mult
-gradient =  gradient*mult
+IF (n_params() EQ 2) THEN BEGIN
+   norm_gradient = gradient_data+norm_gradient_prior
+   gradient = factor*(norm_gradient-total(norm_x*norm_gradient))
+   gradient =  gradient*mult
+ENDIF
 
 if (print_times) THEN print,'   > wisard_jtotal_x : TOTAL: ',SYSTIME(/SECONDS )-t_global
 

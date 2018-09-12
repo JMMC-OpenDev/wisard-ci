@@ -187,7 +187,10 @@ PRO WISARD_PLOT_FIT,RAD_FREQS = rad_freqs, ABS_HX = abs_hx, ABS_Y = abs_y, $
                     COLORS = colors, $
                     VERSION = version, HELP = help
 
-  on_error,2
+;  on_error,2
+  T3DATA=CLOT_FROM_DATA*180./!DPI
+  T3CMDATA=CLOT_FROM_CMDATA*180./!DPI
+  T3XDATA=CLOT_FROM_CURR_X*180./!DPI
 
   IF keyword_set(version) THEN $
      printf, -2, '% '+routine_courante()+': $Revision: 1.11 $, $Date: 2010-12-08 14:56:08 $'
@@ -237,10 +240,10 @@ PRO WISARD_PLOT_FIT,RAD_FREQS = rad_freqs, ABS_HX = abs_hx, ABS_Y = abs_y, $
   wis_legend, tstring, line = tlinestyle, psym = tsym, color = colors_inside, /bottom, /left, clear = clear
 
   !P.POSITION=[0.05,0.1,0.95,0.3]
-  plot,clot_freqs,CLOT_FROM_DATA, color=-1,  XRANGE = [0, max(clot_freqs)*1.05], /NODATA
-  oplot,clot_freqs,CLOT_FROM_DATA, color=colors_inside[0] , psym=7
-  oplot, clot_freqs, CLOT_FROM_CMDATA, color=colors_inside[1], psym=5
-  oplot, clot_freqs, CLOT_FROM_CURR_X,psym=6,color =colors_inside[2] 
+  plot,clot_freqs,T3DATA, color=-1,  XRANGE = [0, max(clot_freqs)*1.05], /NODATA
+  oplot,clot_freqs,T3DATA, color=colors_inside[0] , psym=7
+  oplot, clot_freqs, T3CMDATA, color=colors_inside[1], psym=5
+  oplot, clot_freqs, T3XDATA,psym=6,color =colors_inside[2] 
   tstring = ['Original data.clot', 'Closure from initial cmdata','Closure derived from current image']
   tlinestyle= [0,0,0]           ;
   tsym= [7, 5, 6]
