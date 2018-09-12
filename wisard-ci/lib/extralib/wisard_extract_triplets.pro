@@ -272,7 +272,7 @@ secondInDays=1d/86400d
      for j=0L,n_elements(oiwavelength)-1 do begin   
         if (oiwavelength[J].insname EQ list_of_backends[K]) then begin   
            perBackendWlList[K]=ptr_new([*(oiwavelength[J]).eff_wave])   
-           break   
+           break
         endif   
      endfor  
   endfor
@@ -293,6 +293,7 @@ secondInDays=1d/86400d
         theVis=*(perBackendVisList[iBackend]) 
         if total(theVis eq -1) eq 1 then CONTINUE
      endif
+
 
      t3_timelist=[oit3[theT3].mjd] 
      aa=sort(t3_timelist) & t3sortedtimes=t3_timelist[aa]
@@ -392,8 +393,12 @@ secondInDays=1d/86400d
         t3time=(*myT3Values[iTime,goodTimeIndex])[0]
         if verbose gt 1 then print,format='(%"time %d: %20.12f")',iTime,t3time
 
-        t3timeMin=(*myT3Values[iTime,goodTimeIndex])[0]-(*myT3Values[t3int_time_]*secondInDays)/2.
-        t3timeMax=(*myT3Values[iTime,goodTimeIndex])[0]+(*myT3Values[t3int_time_]*secondInDays)/2.
+                                ; integration time in which we should
+                                ; find some V2 is (typically) the max of
+                                ; integration time for this iTime:
+        typicalIntegrationTime=max(*myT3Values[iTime,t3int_time_])*secondInDays/2.
+        t3timeMin=(*myT3Values[iTime,goodTimeIndex])[0]-typicalIntegrationTime
+        t3timeMax=(*myT3Values[iTime,goodTimeIndex])[0]+typicalIntegrationTime
 
         for it3=0L,t3_nt3[iTime]-1 do begin ;same time, all concerned triplets
            t3_12= oifits_baseline_encode((*myT3Values[iTime,t3sta_index_])[*,it3],0,1)
@@ -547,6 +552,7 @@ secondInDays=1d/86400d
 NO_T3_HERE:
      endfor
   endfor
+
 ; endfor ; outer loop on targets supressed!
   if (total(size(outStructure)) eq 0) then begin 
      message,/informational,"Severe problem with this dataset, stopping here."
