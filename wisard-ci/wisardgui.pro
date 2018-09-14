@@ -32,6 +32,7 @@
 ;    NBITER: max number of iterations (50 by default)
 ;    NP_MIN: minimum number of resels to reconstruct. default computed
 ;    internally 
+;    REGUL = one of ['L1L2','L1L2WHITE','PSD','SOFT_SUPPORT']
 ;    INIT_IMG: Guess start image (fits). Supposedly not mandatory
 ;    according to the doc although unescapable in practice.
 ;
@@ -42,7 +43,7 @@
 ;    variable xx. Interactive mode only. Can be used as an imput
 ;    image, as init_img reads also IDL/GDL variables. 
 ;
-;    The other kw are best described in the documentation, see:
+;    The (other) Keywords are best described in the documentation, see:
 ;    WISARD:
 ;    http://www.mariotti.fr/doc/approved/JMMC-MAN-2500-0001.pdf
 ;    OImaging interface:
@@ -66,7 +67,7 @@
 ;
 ;-
 
-pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,delta=delta,_extra=ex,help=help
+pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,delta=delta,_extra=ex,help=help
 
 @ "wisard_common.pro"
 term=getenv("TERM")
@@ -92,7 +93,7 @@ end
   dofov=n_elements(fov) ne 0
   donp_min=n_elements(np_min) ne 0
   doregul=n_elements(regul) ne 0
-  doinit_img=n_elements(init_img) ne 0
+  doinit_img=n_elements(passed_init_img) ne 0
   dorgl_prio=n_elements(rgl_prio) ne 0
   dowaverange=n_elements(waverange) ne 0
   doScale=n_elements(scale) ne 0
@@ -103,7 +104,6 @@ end
   if dofov then passed_fov=fov
   if donp_min then passed_np_min = np_min
   if doregul then passed_regul=regul
-  if doinit_img then passed_init_img=init_img
   if dorgl_prio then passed_rgl_prio=rgl_prio
   if dowaverange then passed_waverange=waverange
   if doScale then passed_scale=scale
@@ -531,8 +531,8 @@ end
   FXADDPAR,ouput_params_header,'LAST_IMG',reconstructed_image_hduname
   FXADDPAR,ouput_params_header,'MAXITER',nbiter
   FXADDPAR,ouput_params_header,'RGL_NAME',regul_name[regul]
-  FXADDPAR,ouput_params_header,'SCALE',scale
-  FXADDPAR,ouput_params_header,'DELTA',delta
+  if doScale then FXADDPAR,ouput_params_header,'SCALE',scale
+  if doDelta then FXADDPAR,ouput_params_header,'DELTA',delta
   FXADDPAR,ouput_params_header,'THRESHOL',threshold
   FXADDPAR,ouput_params_header,'NP_MIN',np_min
   FXADDPAR,ouput_params_header,'FOV',fov,'Field of View (mas)'
