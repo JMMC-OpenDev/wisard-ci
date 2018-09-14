@@ -552,12 +552,11 @@ FUNCTION WISARD, masterDataArray,  $
      if (n_indx_badflag gt 0) then begin 
         print, format='(%" Setting a null weight on %d bad-flagged data")',n_indx_badflag
         
-;        w_tan_0=cmdata.w_tan    ; intermediate variable 
-;        w_rad_0=cmdata.w_rad    ; intermediaire variable 
-;        w_rad_0[indx_badflag]=0.
-;        w_tan_0[indx_badflag]=0.
-        cmdata[indx_badflag].w_tan=0.
-        cmdata[indx_badflag].w_rad=0.
+        w_tan_0=cmdata.w_tan    ; intermediate variable 
+        w_rad_0=cmdata.w_rad    ; intermediaire variable 
+        w_tan_0[indx_badflag]=(w_rad_0[indx_badflag]=0.)
+        cmdata.w_tan=w_tan_0
+        cmdata.w_rad=w_rad_0 
      endif
      
      ; create consistent all_cmdata by adding zero spacing fake data.
@@ -607,21 +606,32 @@ FUNCTION WISARD, masterDataArray,  $
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; INITIALISATIONS
 ; Initialisation of default object: dirty map, or guess if given, with positivity
-  IF (size(guess))[0] gt 1 THEN BEGIN
-; recenter guess is mandatory
-     guess=wisard_recenter(guess)
+; inverse FT of myopic complex visibilities:
+  dirty_map=0
+  a=(conj(H))[indx_goodflag,*]
+  b=(reform(cmdata.vis,(size(H))[1]))[indx_goodflag]
+  dirty_map=matrix_multiply(a,b,/ATRANSPOSE)
+  a=0
+  b=0
+  dirty_beam = real(dirty_map, VERSION = version) > 0
+ ; taper with gaussian ?
+ ; taper = PSF_GAUSSIAN( Npixel=NP, FWHM=[NP/4,NP/4], /NORMAL )
+ ; dirty_beam *= taper
+  nguess = reform(dirty_beam,NP,NP)
+
+  IF (size(guess))[0] gt 1 then begin
      toto=[2,NP,NP]
      if (total((size(guess))[0:2] eq toto) eq 3) then nguess=guess > 0 else nguess = congrid(guess, NP, NP)  > 0 ; matrice guess redimenssionnee a NPxNP
-  ENDIF  ELSE BEGIN
-; inverse FT of myopic complex visibilities:
-     dirty_map=0
-     a=(conj(H))[indx_goodflag,*]
-     b=(reform(cmdata.vis,(size(H))[1]))[indx_goodflag]
-     dirty_map=matrix_multiply(a,b,/ATRANSPOSE)
-     a=0
-     b=0
-     nguess = reform(real(dirty_map, VERSION = version),NP,NP) > 0
-  ENDELSE
+                                ; in some cases the regridded image
+                                ; (especially with puncts) is
+                                ; void and trouble will happen. Avoid
+                                ; it by not using it
+     if (total(nguess) le 0) then begin
+        strNP = strtrim(string(NP),2)
+        message,/informational,"Init Image (resampled to desired "+strNP+"x"+strNP+" size) is void. Using tapered Dirty Beam as initial Image"       
+        nguess = reform(dirty_beam,NP,NP)
+     endif
+  ENDIF
   nguess = nguess/total(nguess) ; saved in aux_output.
   x = reform(nguess, n_elements(nguess))
 
@@ -841,6 +851,8 @@ FUNCTION WISARD, masterDataArray,  $
 
   IF (display NE 0) THEN BEGIN
      wset, display+1
+        mult_phasors=multiply_phasors(achix,operators.C)
+        cloture_from_current_x = angle(mult_phasors) & cloture_from_current_x = reform(cloture_from_current_x, n_elements(cloture_from_current_x),/overwrite)         
         WISARD_PLOT_FIT, RAD_FREQS = rad_freqs,$ 
                          ABS_HX = reform(abs_hx, n_elements(abs_hx)), $
                          ABS_Y  = reform(weights_constant.abs_y_data, n_elements(abs_hx)), $
