@@ -8,6 +8,19 @@
 #
 
 
+# TRAP: Do not leave children jobs running if the shell has been cancelled
+cleanup_trap(){
+  CHILDREN_PIDS=$(jobs -p)
+  if [ -n "$CHILDREN_PIDS" ]
+  then
+    echo -e "SHELL cancelled"
+    # we may try to send only TERM before a pause and a last loop with KILL signal ?
+    kill -9 $CHILDREN_PIDS
+  fi
+}
+trap cleanup_trap EXIT
+
+
 # HERE BEGINS THE SCRIPT
 
 #make FULLSCRIPTNAME and SCRIPTROOT fully qualified
@@ -122,5 +135,8 @@ else
   # add helper to launch gdl properly. this procedure shoudl insure that the IDL/GDL !PATH contains idlastro procedures (readfits.pro etc).
   export GDL_STARTUP="gdl_startup.pro"
 fi
+
 WISARDCI_COMMAND="wisardgui,'"$INPUT"','"$OUTPUT"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}${WAVERANGE_COMMAND}${FLAG_COMMAND}${NPMIN_COMMAND}
+
 gdl -e "$WISARDCI_COMMAND"
+
