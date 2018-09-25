@@ -32,7 +32,7 @@
 ;    NBITER: max number of iterations (50 by default)
 ;    NP_MIN: minimum number of resels to reconstruct. default computed
 ;    internally 
-;    REGUL = one of ['L1L2','L1L2WHITE','PSD','SOFT_SUPPORT']
+;    REGUL = one of ['TOTVAR','L1L2','L1L2WHITE','PSD','SOFT_SUPPORT']
 ;    INIT_IMG: Guess start image (fits). Supposedly not mandatory
 ;    according to the doc although unescapable in practice.
 ;
@@ -123,7 +123,7 @@ end
   endif
 
 ;; define constants
-  regul_name=['L1L2','L1L2WHITE','PSD','SOFT_SUPPORT'] & default_regul=0 ; L1L2
+  regul_name=['L1L2','L1L2WHITE','PSD','SOFT_SUPPORT','TOTVAR'] & default_regul=0 ; L1L2
   defsysv, '!DI', dcomplex(0, 1), 1 ;Define i; i^2=-1 as readonly system-variable
   onemas=1d-3*(!DPi/180D)/3600D     ; 1 mas in radian
 
@@ -465,19 +465,19 @@ end
 ; TOTVAR is just delta=very_small. 
   case regul of
 
-     0: begin
+     0: begin ; L1L2
         if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         if (~doDelta) then delta = 1D
         reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
      end
 
-     1: begin
+     1: begin ; L1L2WHITE
         if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         if (~doDelta) then delta = 1D
         reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
      end
 
-     2: begin
+     2: begin ; PSD
 ; if regul == 1 (psd) if no prior given, create the PSD of the documentation:
         if n_elements(prior) gt 1 then begin ; take centered ft or prior image as PSD
            psd=abs(shift(fft(prior),(size(prior))[1:2]/2+1))
@@ -488,10 +488,16 @@ end
         reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
      end
 
-     3: begin
+     3: begin ; SOFT_SUPPORT
         if ~n_elements(fwhm) then fwhm=10                  ; pixels
         if ~n_elements(mu_support) then mu_support=10.0    ; why not?
         reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
+     end
+
+     4: begin ; TOTVAR
+        if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
+        delta = scale/1D9 ; TOTVAR is L1L2 with delta infinitesimal.
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
      end
      
      else: message,"ERROR: regularization not yet supported, FIXME!"
