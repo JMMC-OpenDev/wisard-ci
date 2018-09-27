@@ -261,6 +261,8 @@ pro model2oifits,input,model,output,target=target
         oiwaveheadarr = (n_elements(oiwaveheadarr) gt 0)?[oiwaveheadarr,oiwavehead]:oiwavehead
      endif else if extname[i] eq  "OI_TARGET" then begin ; only one target.
         oitarget = mrdfits(input,i,targethead)
+     endif else if extname[i] eq  "IMAGE-OI INPUT PARAM" then begin ; only one input param.
+        inputparam = mrdfits(input,i,inputparamhead)
      endif else begin           ; every other tables: may contain an hduname image
         oiother = ptr_new( mrdfits(input,i,header) )
         ; eventually, if has an HDUNAME, get it
@@ -315,7 +317,8 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
   image=mrdfits(model,0,model_main_header)
 ;examine others
   for i=1,mext do begin
-     if m_extname[i] eq "MODEL-VISIBILITIES" then begin
+     if m_extname[i] eq "IMAGE-OI MODEL VISIBILITIES" then begin
+;     if m_extname[i] eq "MODEL-VISIBILITIES" then begin ; old name
         mvis=mrdfits(model,i,m_header)
      endif
   endfor
@@ -353,6 +356,8 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
 
 ; do not write unknown arrays.
 ;  for i=0,n_elements(oiotherarr)-1 do mwrfits,*(oiotherarr[i]),output,*(oiotherheadarr[i]),/silent,/no_copy,/no_comment
+; but write input params (header) . trick is that we NEED to pass a structure.
+  if (n_elements(inputparam)) then mwrfits,{aaa:0.0},output,inputparamhead,/silent,/no_copy,/no_comment
 
   goodinsnamelist=''
 ; write structures updated with computed values: select only sections
