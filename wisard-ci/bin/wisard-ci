@@ -156,11 +156,11 @@ WISARDCI_COMMAND="wisardgui,'"$INPUT"','"$OUTPUT"'"${DISPLAYCOMMAND}${FOVCOMMAND
 
 #echo 'gdl -e "$WISARDCI_COMMAND"'
 
-# fix gdl interactive mode:
-OLDTERM="$TERM"
-TERM=""
+# do not fix gdl interactive mode (not useful anymore?)
+#OLDTERM="$TERM"
+#TERM=""
 
-gdl -e "$WISARDCI_COMMAND"
+echo "$WISARDCI_COMMAND" | gdl
 
-TERM="$OLDTERM"
+#TERM="$OLDTERM"
 
