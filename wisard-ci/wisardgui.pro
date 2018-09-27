@@ -70,9 +70,8 @@
 pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,delta=delta,_extra=ex,help=help
 
 @ "wisard_common.pro"
-term=getenv("TERM")
-wisard_is_interactive =  strlen(term) gt 0 
-@ "wisard_catch_noniteractive.pro"
+wisard_is_interactive =  (fstat(0)).interactive 
+;@ "wisard_catch_noniteractive.pro"
 
 if keyword_set(help) then begin
  doc_library,"wisardgui"
