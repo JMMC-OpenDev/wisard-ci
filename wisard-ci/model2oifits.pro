@@ -31,7 +31,8 @@
 ; (at your option) any later version.                                   
 ;
 ;-
-pro  fill_in_model_vis2,mvis2,vis2,wave,model
+
+pro fill_in_model_vis2,mvis2,vis2,wave,model
                                 ; checks based on dimension of mvis2:
   sz=size(mvis2.ns_model_vis2)
   nvis=(sz[0] gt 1)?sz[2]:sz[1]
@@ -111,7 +112,7 @@ function insert_model_oivis2,vis2,wave,mvis,header, use_target=tid
    return, new_vis2
 end
 
-pro  fill_in_model_t3,mt3,t3,wave,model
+pro fill_in_model_t3,mt3,t3,wave,model
                                 ; checks based on dimension of mvis2:
   sz=size(mt3.ns_model_t3amp)
   nt3=(sz[0] gt 1)?sz[2]:sz[1]
@@ -215,6 +216,11 @@ end
 ; ----------------------- THE MAIN ROUTINE ------------------------------------------
 
 pro model2oifits,input,model,output,target=target
+
+  @ "wisard_common.pro"
+  term=getenv("TERM")
+  wisard_is_interactive =  strlen(term) gt 0 
+  @ "wisard_catch_noniteractive.pro"
 
   dotarget=n_elements(target) ne 0
 

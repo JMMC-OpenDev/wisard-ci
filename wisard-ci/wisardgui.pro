@@ -58,7 +58,7 @@
 ;    At the moment, the model visibility will be forced in ALL wavelengths, not only the
 ;    ones that were used (case where WAVERANGE was specified). FIXME!
 ; LICENCE:
-;    Copyright (C) 2017, G. Duvert unless explicitly mentioned in files.
+; Copyright (C) 2018, G. Duvert unless explicitly mentioned in files.
 ;
 ; This program is free software; you can redistribute it and/or modify  
 ; it under the terms of the GNU General Public License as published by  
@@ -652,3 +652,4 @@ end
      exit,status=0
   endif else if doreconstructed_img then reconstructed_img=aux_output.x 
 end
+
