@@ -49,7 +49,7 @@ pro fill_in_model_vis2,mvis2,vis2,wave,model
        for iwave=0,nwave-1 do begin ; iwave same order with wave.eff_wave
          wlen=wave[iwave].eff_wave*1D9 ; mira in nm.
          ww=where( abs(smodel.eff_wave-wlen) lt 1e-2, count)
-         if (count gt 0) then mvis2[ivis].ns_model_vis2[iwave]=smodel[ww[0]].model_visamp
+         if (count gt 0) then mvis2[ivis].ns_model_vis2[iwave]=(smodel[ww[0]].model_visamp)^2
        endfor
      endif
   endfor
@@ -317,8 +317,7 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
   image=mrdfits(model,0,model_main_header)
 ;examine others
   for i=1,mext do begin
-     if m_extname[i] eq "IMAGE-OI MODEL VISIBILITIES" then begin
-;     if m_extname[i] eq "MODEL-VISIBILITIES" then begin ; old name
+     if( m_extname[i] eq "IMAGE-OI MODEL VISIBILITIES" or  m_extname[i] eq "MODEL-VISIBILITIES" ) then begin ; found in some old version of mira
         mvis=mrdfits(model,i,m_header)
      endif
   endfor
