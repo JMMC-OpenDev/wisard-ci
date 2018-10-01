@@ -83,6 +83,7 @@ end
   wisard_ci_version=getenv('WISARD_CI_VERSION')
   if (strlen( wisard_ci_version) lt 1) then wisard_ci_version='Unversioned'
   message,/informational,"Welcome to Wisard, version "+wisard_ci_version+", you have accepted the copyrights."
+  message,/informational,"Wisard is running on a "+strcompress(!CPU.TPOOL_NTHREADS)+" threads machine."
 
 
   ; memorize passed line values
@@ -509,7 +510,7 @@ end
   snp=strtrim(string(np_min),2)
   sit=strtrim(string(aux_output.iter),2)
 
-  reconstructed_image_hduname=target+'_'+snp+'x'+snp+'_'+sit
+  reconstructed_image_hduname='WISARD-'+wisard_ci_version+'-'+target+'_'+snp+'x'+snp+'_'+sit
   FXADDPAR,main_header,'HDUNAME',reconstructed_image_hduname
   FXADDPAR,main_header,'CTYPE1','RA---SIN'
   FXADDPAR,main_header,'CTYPE2','DEC--SIN'
