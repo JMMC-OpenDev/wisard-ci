@@ -69,9 +69,11 @@
 
 pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,delta=delta,_extra=ex,help=help
 
+; if /display option, we are interactive
+
 @ "wisard_common.pro"
-wisard_is_interactive =  (fstat(0)).interactive 
-;@ "wisard_catch_noniteractive.pro"
+wisard_is_interactive =  keyword_set(display)
+@ "wisard_catch_noniteractive.pro"
 
 if keyword_set(help) then begin
  doc_library,"wisardgui"
@@ -82,9 +84,11 @@ end
 
   wisard_ci_version=getenv('WISARD_CI_VERSION')
   if (strlen( wisard_ci_version) lt 1) then wisard_ci_version='Unversioned'
+  if wisard_is_interactive then extra_comment="" else extra_comment=", batch mode"
   message,/informational,"Welcome to Wisard, version "+wisard_ci_version+", you have accepted the copyrights."
-  message,/informational,"Wisard is running on a "+strcompress(!CPU.TPOOL_NTHREADS)+" threads machine."
+  message,/informational,"Wisard is running with "+strcompress(!CPU.TPOOL_NTHREADS)+" threads"+extra_comment+"."
 
+  if wisard_is_interactive then device, decomposed=0, retain=2
 
   ; memorize passed line values
   dotarget=n_elements(target) ne 0 
@@ -109,8 +113,6 @@ end
   if doScale then passed_scale=scale
   if doDelta then passed_delta=delta
 
-
-  if wisard_is_interactive and keyword_set(display) then device, decomposed=0, retain=2
 
 
  ; after catch to handle this first error message if necessary. 
@@ -510,10 +512,10 @@ end
   snp=strtrim(string(np_min),2)
   sit=strtrim(string(aux_output.iter),2)
 
-  reconstructed_image_hduname='WISARD-'+wisard_ci_version+'-'+target+'_'+snp+'x'+snp+'_'+sit
+  reconstructed_image_hduname=target+'_'+snp+'x'+snp+'_'+sit
   FXADDPAR,main_header,'HDUNAME',reconstructed_image_hduname
-  FXADDPAR,main_header,'CTYPE1','RA---SIN'
-  FXADDPAR,main_header,'CTYPE2','DEC--SIN'
+  FXADDPAR,main_header,'CTYPE1','RA---TAN'
+  FXADDPAR,main_header,'CTYPE2','DEC--TAN'
   FXADDPAR,main_header,'CRPIX1',nx/2
   FXADDPAR,main_header,'CRPIX2',ny/2
   FXADDPAR,main_header,'CROTA1',0.0
@@ -542,6 +544,8 @@ end
   FXADDPAR,ouput_params_header,'THRESHOL',threshold
   FXADDPAR,ouput_params_header,'NP_MIN',np_min
   FXADDPAR,ouput_params_header,'FOV',fov,'Field of View (mas)'
+  FXADDPAR,ouput_params_header,'SOFTWARE','WISARD','IR software name'
+  FXADDPAR,ouput_params_header,'VERSION',wisard_ci_version,'version of software'
 
   dummystruct={DUMMY: 0.0d}; we need a dummy structure to make mwrfits write a binary extension
   mwrfits,dummystruct,output,ouput_params_header,/silent,/no_copy,/no_comment
@@ -558,8 +562,8 @@ end
      ny=sz[2]
      FXADDPAR,init_image_header,'EXTNAME','INITIAL_IMAGE'
      FXADDPAR,init_image_header,'HDUNAME',init_img
-     FXADDPAR,init_image_header,'CTYPE1','RA---SIN'
-     FXADDPAR,init_image_header,'CTYPE2','DEC--SIN'
+     FXADDPAR,init_image_header,'CTYPE1','RA---TAN'
+     FXADDPAR,init_image_header,'CTYPE2','DEC--TAN'
      FXADDPAR,init_image_header,'CRPIX1',nx/2
      FXADDPAR,init_image_header,'CRPIX2',ny/2
      FXADDPAR,init_image_header,'CROTA1',0.0
