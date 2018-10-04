@@ -217,9 +217,9 @@ end
 
 pro model2oifits,input,model,output,target=target
 
+  ; if /display option, we are interactive
   @ "wisard_common.pro"
-  term=getenv("TERM")
-  wisard_is_interactive =  strlen(term) gt 0 
+  wisard_is_interactive =  keyword_set(display)
   @ "wisard_catch_noniteractive.pro"
 
   dotarget=n_elements(target) ne 0

@@ -70,7 +70,6 @@
 pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,delta=delta,_extra=ex,help=help
 
 ; if /display option, we are interactive
-
 @ "wisard_common.pro"
 wisard_is_interactive =  keyword_set(display)
 @ "wisard_catch_noniteractive.pro"
