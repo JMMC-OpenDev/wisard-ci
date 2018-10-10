@@ -185,7 +185,7 @@ end
         if req_wave_min ne '0' then wave_min=req_wave_min
 
 ; WAVE_MAX
-        req_wave_max=sxpar(input_params_header,"WAVE_MIN")
+        req_wave_max=sxpar(input_params_header,"WAVE_MAX")
         if req_wave_max ne '0' then wave_max=req_wave_max
 
 ; USE_VIS,USE_VIS2,USE_T3: ignored
