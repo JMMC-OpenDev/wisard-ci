@@ -223,9 +223,9 @@ end
         req_np_min=sxpar(input_params_header,"NP_MIN") 
         if req_np_min gt 0 then np_min=req_np_min
 
-; FLUXERR -> threshold
-        req_fluxerr=sxpar(input_params_header,"FLUXERR") 
-        if req_fluxerr gt 0 then threshold=double(req_fluxerr)/(np_min)^2
+; THRESHOL -> threshold
+        req_threshold=sxpar(input_params_header,"THRESHOL") 
+        if req_threshold gt 0 then threshold=double(req_threshold)
 
 ; FOV
         req_fov=sxpar(input_params_header,"FOV") 
