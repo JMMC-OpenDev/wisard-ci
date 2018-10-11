@@ -3,7 +3,7 @@
      CATCH, error_status
      if (error_status ne 0) then begin
         CATCH,/CANCEL
-        message,/reissue_last,/informational
+        message,/reissue_last
         print,"non-interactive session: error has occured, exiting."
         exit, status=1
      end
