@@ -404,7 +404,7 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
   masterDataArray=masterDataArray[www]
 ; individually check an trim each data structure
   someDataIsAvailable=0
-  someRangeIsAvailable=(wave_min eq wave_max) ; 1 if we do not select any wave range.
+  someRangeIsAvailable=long(wave_min eq wave_max) ; 1 if we do not select any wave range.
 ; total data wavelength range: compute, intializing to some good
 ; value:
   total_wave_min=min((*masterDataArray[0]).wlen)
@@ -420,7 +420,7 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
 ; subset is really asked for. wave_min==wave_mask==-1 if no range has
 ; been asked for.
      if (wave_min lt wave_max) then begin ; which have probaly been read in input file
-        w=where(data.wlen lt wave_min or data.wlen gt wave_max, count)
+        w=where(data.wlen ge wave_min and data.wlen le wave_max, count)
         if count gt 0 then begin ; there is indeed a subset asked!
            w=where(data.wlen ge wave_min and data.wlen le wave_max, count)
            if count gt 0 then begin
@@ -434,7 +434,7 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
         total_wave_max=max([total_wave_max,data.wlen])        
      endelse
   endfor
-
+  
 
   if ( ~someDataIsAvailable) then message,"ERROR: Only Flagged Data Available, Aborting."
   if ( ~someRangeIsAvailable) then message,"ERROR: no data found within requested wavelength range, Aborting. (request is probably smaller than a single instrument channel?)"
