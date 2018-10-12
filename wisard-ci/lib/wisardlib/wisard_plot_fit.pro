@@ -241,12 +241,12 @@ PRO WISARD_PLOT_FIT,RAD_FREQS = rad_freqs, ABS_HX = abs_hx, ABS_Y = abs_y, $
 
   !P.POSITION=[0.05,0.1,0.95,0.3]
   plot,clot_freqs,T3DATA, color=-1,  XRANGE = [0, max(clot_freqs)*1.05], /NODATA
-  oplot,clot_freqs,T3DATA, color=colors_inside[0] , psym=7
-  oplot, clot_freqs, T3CMDATA, color=colors_inside[1], psym=5
-  oplot, clot_freqs, T3XDATA,psym=6,color =colors_inside[2] 
-  tstring = ['Original data.clot', 'Closure from initial cmdata','Closure derived from current image']
-  tlinestyle= [0,0,0]           ;
-  tsym= [7, 5, 6]
+  oplot, clot_freqs, T3XDATA,psym=7,color =colors_inside[0] 
+  oplot,clot_freqs,T3DATA, color=colors_inside[1] , psym=6
+;  oplot, clot_freqs, T3CMDATA, color=colors_inside[1], psym=5
+  tstring = ['Closure derived from current image','Measured closures'];, 'Closure from initial cmdata',]
+  tlinestyle= [0,0];,0]           ;
+  tsym= [7, 6];, 5]
   wis_legend, tstring, line = tlinestyle, psym = tsym, color = colors_inside, /bottom, /left, clear = clear
 
 ;  ord_rad = sort(rad_freqs)
