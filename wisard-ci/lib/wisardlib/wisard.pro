@@ -526,7 +526,7 @@ FUNCTION WISARD, masterDataArray,  $
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Flag indices 
      median_err=median(data.vis2err)
-     flagvis=(data.vis2flag or (abs(data.vis2) gt 1.+3*median_err) or (data.vis2err le 1e-10) ) 
+     flagvis=(data.vis2flag or (abs(data.vis2) gt 1.+3*median_err) or (data.vis2err le 1e-10) ) ; or ~finite(data.vis2*data.vis2err)  ) 
      
      if (~use_flagged_data) then $
         indx_goodflag=where(((flagvis EQ 0) AND (abs(operators.dagc)#(data.clotflag) EQ 0)), $
@@ -548,7 +548,8 @@ FUNCTION WISARD, masterDataArray,  $
         print,'   ', count,' from flagged VIS2.'
      ENDIF
      
-;; weights set at 0 for all 'bad'flags   
+;; weights set at 0 for all 'bad'flags AND values of VIS to ZERO->NaNs
+;; will crash WISARD!   
      if (n_indx_badflag gt 0) then begin 
         print, format='(%" Setting a null weight on %d bad-flagged data")',n_indx_badflag
         
@@ -557,6 +558,9 @@ FUNCTION WISARD, masterDataArray,  $
         w_tan_0[indx_badflag]=(w_rad_0[indx_badflag]=0.)
         cmdata.w_tan=w_tan_0
         cmdata.w_rad=w_rad_0 
+        vis_0=cmdata.vis
+        vis_0[indx_badflag]=complex(0,0)
+        cmdata.vis=vis_0
      endif
      
      ; create consistent all_cmdata by adding zero spacing fake data.
@@ -586,6 +590,10 @@ FUNCTION WISARD, masterDataArray,  $
 ; temporary rename to avoid retyping
   cmdata=allcmdata
   operators=master_operators
+
+; print size of problem
+  print,'Wisard is attempting to reconstruct a '+strcompress(n_elements(cmdata.w_rad)*np_min^2)+' problem. (double complex values)'
+
 ;
   H=WISARD_MAKE_H(FREQS_U=freqs_u, FREQS_V=freqs_v,$
                   OVERSAMPLING = oversampling,$
@@ -593,6 +601,8 @@ FUNCTION WISARD, masterDataArray,  $
                   ORIGIN = origin, $ 
                   NP_OUTPUT = NP, STEP_OUTPUT = step_output, /verbose, VERSION = version)
                       
+  print,'Final problem size is '+strcompress(n_elements(H))
+
 ;;; DROP THIS FOR THE TIME BEING! ;;;;  
 ;;;;;;;;;;Rebuild in case NT=3, to avoid integer ambiguities
 ;;;  IF ((operators.n_tels EQ 3) AND (n_elements(guess) gt 0 )) THEN BEGIN
@@ -613,7 +623,12 @@ FUNCTION WISARD, masterDataArray,  $
   dirty_map=matrix_multiply(a,b,/ATRANSPOSE)
   a=0
   b=0
+
+  ncmdata=n_elements(cmdata)
+
+
   dirty_beam = real(dirty_map, VERSION = version) > 0
+
  ; taper with gaussian ?
  ; taper = PSF_GAUSSIAN( Npixel=NP, FWHM=[NP/4,NP/4], /NORMAL )
  ; dirty_beam *= taper
@@ -635,7 +650,7 @@ FUNCTION WISARD, masterDataArray,  $
   nguess = nguess/total(nguess) ; saved in aux_output.
   x = reform(nguess, n_elements(nguess))
 
-  alpha = randomn(seed, operators.n_tels-1, n_elements(cmdata))*0D ;
+  alpha = randomn(seed, operators.n_tels-1, ncmdata)*0D ;
 
 ;Use pointers for a faster passage of variables
   re_y_data = PTR_NEW(real(cmdata.vis), /NO_COPY)
@@ -660,7 +675,7 @@ FUNCTION WISARD, masterDataArray,  $
                       w_tan:(cmdata.w_tan)}
   
   rad_freqs = reform(sqrt(abs2(cmdata.freqs_u)+abs2(cmdata.freqs_v)), $
-                     operators.n_bases*n_elements(cmdata))
+                     operators.n_bases*ncmdata)
   clot_freqs=cmdata_clot_maxfrequency(cmdata)
   
   IF keyword_set(display) THEN BEGIN
@@ -712,6 +727,7 @@ FUNCTION WISARD, masterDataArray,  $
   IF (prior.positivity NE 0B) THEN active_set = bytarr(prior.squareNP) + 1B
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;;; MAIN LOOP (SELF-CALIBRATION)
   continue = 1B
   iter = 0L                     ; idem for fmin_gpa et fmin_op
@@ -732,6 +748,17 @@ FUNCTION WISARD, masterDataArray,  $
              title = !PROMPT+nbr2str(display+1)+': plot of visibility fit'
   ENDIF
 
+; optimize: compute it only once.
+  ones=replicate(1.,n_elements(H[0,*]))
+  
+;; progressive use of recontructed image. assuming final image contrast
+;; is 'contrast', enable it by successive steps, retaining more pixels
+;; everytime.
+;  contrast=1000
+;  contrast_step=contrast/nbiter 
+;  current_contrast=1.0
+
+;a=tic()
   WHILE ((iter LT nbiter) AND (conv GE epsilon) AND (continue)) DO BEGIN
      
      if (VERBOSE_TEST) THEN print, ' ********* iter : ', iter
@@ -743,8 +770,17 @@ FUNCTION WISARD, masterDataArray,  $
      norm_x = x*factor
      
      if (VERBOSE_TEST) THEN print, ' rms(map x) : ',stddev(x)
-     
-     achix = reform(H#norm_x, operators.n_bases, n_elements(cmdata)) ; TF de norm_x (guess au depart, resultat de boucle ensuite)  
+;     count=0
+;     while(count lt 1) do begin
+;      current_threshold=1./current_contrast
+;      w2=where(norm_x gt current_threshold/NP^2, count) & print,NP^2,current_threshold,count
+;      current_contrast+=contrast_step
+;     endwhile
+;     norm_x2=norm_x[w2]
+;     H2=H[*,w2]
+;     achix = reform(H2#norm_x2, operators.n_bases, ncmdata) ; TF de norm_x (guess au depart, resultat de boucle ensuite)  
+
+     achix = reform(H#norm_x, operators.n_bases, ncmdata) ; TF de norm_x (guess au depart, resultat de boucle ensuite)  
      abs_hx = abs(achix) 
      abs2_hx = abs2(achix)
      arg_hx = angle(achix)
@@ -753,7 +789,7 @@ FUNCTION WISARD, masterDataArray,  $
      wx2 = 2D*abs_hx*abs_y_data*cmdata.w_rad
 
      weights_x = {abs_hx:abs_hx, arg_hx:arg_hx, wx1:wx1, wx2:wx2}
-     
+
      IF (display NE 0) THEN BEGIN
         mult_phasors=multiply_phasors(achix,operators.C)
         cloture_from_current_x = angle(mult_phasors) & cloture_from_current_x = reform(cloture_from_current_x, n_elements(cloture_from_current_x),/overwrite)         
@@ -774,6 +810,7 @@ FUNCTION WISARD, masterDataArray,  $
      ;;minimization of alpha    
                                 ;
      if keyword_set(print_times) then t= SYSTIME(/SECONDS ) ; t4 
+
      FMIN_OP, alpha, error, FUNC = 'wisard_jtotal_alpha', LIBRARY = library, $
               /ALLTHEWAY, CONV_THRESHOLD = epsilon/2D, $
               ITMAX = itmax_alpha, $
@@ -786,8 +823,8 @@ FUNCTION WISARD, masterDataArray,  $
      ;; MIN of x, possibly with positivity constraint   
      
      ; build ph matrix (fast method): 
-     ph=H*(REFORM(EXP(!dI*(operators._B#alpha)),operators.n_bases*n_elements(cmdata),/overwrite)#replicate(1.,n_elements(H[0,*])))
-     
+     ph=H*(REFORM(EXP(!dI*(operators._B#alpha)),operators.n_bases*ncmdata,/overwrite)#ones)
+   
      ;Use pointers for a faster passage of variables
      weights_alpha = {re_ph:PTR_NEW(real(ph), /NO_COPY), im_ph:PTR_NEW(imaginary(ph), /NO_COPY)}
      
@@ -827,10 +864,12 @@ FUNCTION WISARD, masterDataArray,  $
               '. Criterion=',  $
               nbr2str(total(crit_array), format = '(F25.4)'), ' = ', $
               nbr2str(total(crit_array[0]), format = '(F25.4)'), ' + ', $
-;              nbr2str(total(crit_array[0])/(2*n_elements(cmdata)), format = '(F25.4)'), ' + ', $
+;              nbr2str(total(crit_array[0])/(2*ncmdata), format = '(F25.4)'), ' + ', $
               nbr2str(total(crit_array[1]), format = '(F25.4)')
      ENDIF
   
+;print,toc(a)
+
   ENDWHILE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -839,7 +878,7 @@ FUNCTION WISARD, masterDataArray,  $
   factor = 1D/total(x)
 ; print,  'factor', factor
   norm_x = x*factor
-  achix = (reform(H#norm_x, operators.n_bases, n_elements(cmdata))) ; TF
+  achix = (reform(H#norm_x, operators.n_bases, ncmdata)) ; TF
   abs_hx = abs(achix)
   abs2_hx = abs2(achix, VERSION = version)
   arg_hx = angle(achix, VERSION = version)
