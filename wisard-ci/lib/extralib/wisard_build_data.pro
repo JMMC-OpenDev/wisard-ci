@@ -36,10 +36,10 @@
 ;     v0.0 2013    G. Duvert
 ;-
 
-function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberoftels=numberoftels, first=first
+function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberoftels=numberoftels, no_best_closures=nob
 ;ON_ERROR,2
 ; quick and dirty patch: make the result a table of pointers on
-; what was the intial result, a data structure. Here, if it exists,
+; what was the initial result, a data structure. Here, if it exists,
 ; the pointer points to an historical data structure for N telescopes,
 ; N being the index(+3 : because we need at least 3 telescopes to
 ; start with) of the table of pointers (limited here to MAXTEL=8
@@ -47,9 +47,8 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
 
    MAXTEL=9
 
+   if (n_elements(nob) eq 0) then nobest=0 else nobest=(nob eq 1)
    if (n_elements(verbose) eq 0) then verbose=0
-   nofirst=0 ; 'first' was given
-   if (n_elements(first) eq 0) then begin nofirst=1 & first=0 & endif
    free_numberoftels=0
    if (n_elements(numberoftels) eq 0) then begin numberoftels=-1 & free_numberoftels=1 & endif
    warnHasIncompatibleConfigurations=0
@@ -71,6 +70,8 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
    temporarySubproduct=ptrarr(ntimes) ; pointer table to individual structures.
    for iTime=0L,ntimes-1 do begin
       bundle=*data[iTime]
+      wlen=*bundle[0,11]
+      nbwlen=n_elements(wlen)
       nclot=(size(bundle,/dim))[0]
       tellist=intarr(3*nclot)
       for iClot=0L,nClot-1 do tellist[iClot*3:iClot*3+2]=*bundle[iClot,1]
@@ -88,21 +89,55 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
       if (verbose gt 0) then begin
          if (nClot lt nindeptclostheoric) then print,format='(%"Data for time %f has less closures (%d) than needed (%d), dropped.")',*bundle[0,0],nClot,nindeptclostheoric
          if (nClot gt nindeptclostheoric) then print,format='(%"Data for time %f has more closures (%d) than needed (%d).")',*bundle[0,0],nClot,nindeptclostheoric
-         if (nClot eq nindeptclostheoric) then print,format='(%"Data for time %f has no redundant closures. Noise optimisation will not be possible.")',*bundle[0,0]
+;         if (nClot eq nindeptclostheoric and nclot ne 1) then print,format='(%"Data for time %f has no redundant closures. Noise optimisation will not be possible.")',*bundle[0,0]
       endif
 
-      ;; if we precise the reference telescope it means we want to check all configurations, so we need all possible closures. drop if not available
-      if (nClot lt nclostheoric and nofirst eq 0 ) then begin
+      ;; Difficult to find a coherent subset of less than the number
+      ;; of found telescopes, but it should be feasible ->TODO
+      if (nClot lt nindeptclostheoric) then begin
          currentNumberofTels[iTime]=0
          goto, NOT_GOOD_ENOUGH
       end
+      
+      mytels=tellist[uniq(tellist,SORT(tellist))]
+      reftel=mytels[0]
+; optimization possible when more closures than needed.
+      if (~nobest) then begin 
+         if (nindeptclostheoric gt 1 and nClot gt nindeptclostheoric) then begin
+            if (verbose gt 2) then print,"looking for best configuration..."
+                                ; sort the nClot by an estimate of
+                                ; t3phierr, get the corresponding conf
+            errsample=dblarr(nclot)
+            listtelclos=intarr(3,nclot)
+            for iClot=0L,nclot-1 do begin ; loop on all closures
+               listtelclos[0,iclot]=(*bundle[iClot,1])[0]
+               listtelclos[1,iclot]=(*bundle[iClot,1])[1]
+               listtelclos[2,iclot]=(*bundle[iClot,1])[2]
+               thet3phierr=[*(*bundle[iClot,3])]*!DPI/180D
+               thet3flag=(*(*bundle[iClot,4]) eq 84) ; ascii 'T'
+               wherenan=where(~finite(thet3phierr), nancount) & if(nancount GT 0) then thet3flag[wherenan]=1
+;            w=where(thet3flag eq 0,/null) ; /NULL to avoid the -1
+;            problem: gdl not ready!
+               w=where(thet3flag eq 1, count) & if (count gt 0) then errsample[iclot]=mean(thet3phierr[w]) else errsample[iClot]=!values.d_infinity
+            endfor
+                                ; clotlist is the list of 'best' closures
+            clotlist=((indgen(nclot))[sort(errsample)])[0:nindeptclostheoric-1]
+                                ; in telescope id list, one is present in each 3 selected closures:
+            shortlist=reform(listtelclos[*,clotlist], 3*nindeptclostheoric)
+            aa=histogram(shortlist,binsize=1,loc=loc) ;
+            w=where(aa eq 3)
+            reftel=loc[w]       ; id of the reference telescope common to the N best closures.
+         endif
+      endif
 
-      mytels=tellist[uniq(tellist,SORT(tellist))] 
-      ;;create an ordered triplet list. 
-      mytels=shift(temporary(mytels),-first) 
+      ;;create an ordered triplet list: shuffle to have reftel at
+      ;;index 0:reftel being an array,this works only with reftel[0]
+      w=where(mytels eq reftel[0],count) & if count lt 1 then message,'internal logic error in wisard_build_data(), please report'
+      mytels=shift(temporary(mytels),-w)
       myclos=intarr(3,nindeptclostheoric)
       index=0
       mytel1=mytels[0]
+      mysign=["x","+","-"]
       for J=1L,ntels-1 do begin 
          mytel2=mytels[j] 
          for K=J+1,ntels-1 do begin 
@@ -114,7 +149,7 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
       ;;start with actual closures at time iTime
       doneclot=intarr(nindeptclostheoric)
       for J=0L,nindeptclostheoric-1 do begin
-         for iClot=0L,nclot-1 do begin
+         for iClot=0L,nclot-1 do begin ; loop on all closures and find it
             the_triplet=*bundle[iClot,1]
             sign= oifits_triplet_compare(myclos[*,J],the_triplet)
             if (sign ne 0) then begin
@@ -134,7 +169,7 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
                cloterr=(total(size(cloterr)) LT 1)?[thet3phierr]:[[cloterr],[thet3phierr]]
                clotflag=(total(size(clotflag)) LT 1)?[thet3flag]:[[clotflag],[thet3flag]]
                doneclot[J]=1 
-               if (verbose gt 2) then print,format='(%"found triplet %i %i %i")',sign*(*bundle[iClot,1])[0],sign*(*bundle[iClot,1])[1],sign*(*bundle[iClot,1])[2]
+               if (verbose gt 2) then print,format='(%"found triplet (%s) %i %i %i")',mysign[sign],(*bundle[iClot,1])[0],(*bundle[iClot,1])[1],(*bundle[iClot,1])[2]
                break
             endif
          endfor
@@ -174,8 +209,6 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
       if (verbose gt 2) then print,'uv coordinates list used:'
       if (verbose gt 2) then print, mycoord
       ;;find and populate output struct wave
-      wlen=*bundle[0,11]
-      nbwlen=n_elements(wlen)
       donebase=intarr(nbases)
       for J=0L,nbases-1 do begin
          if (donebase[J] EQ 1) then break
@@ -302,6 +335,7 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
 ;;;            endfor
 ;;;         endif else begin
 
+            print,format='(%"Data for time %f has %d closures and %d v2 retained.")',*bundle[0,0],nClot*nbwlen,nClot*3*nbwlen
             struct={vis2:vis2[*,0]*1D, vis2err:vis2err[*,0]*1D, vis2flag:vis2flag[*,0], clot:clot[*,0]*1D, cloterr:cloterr[*,0]*1D, clotflag:clotflag[*,0], freqs_u:freqs_u[*,0]*1D, freqs_v:freqs_v[*,0]*1D, wlen:wlen[0]*1D}
             desiredSize=nbWlen
             strindex=1
