@@ -221,19 +221,18 @@ PRO WISARD_PLOT_FIT,RAD_FREQS = rad_freqs, ABS_HX = abs_hx, ABS_Y = abs_y, $
   plot,rad_freqs[indx_goodflag],abs_y[indx_goodflag],  XRANGE = [xmin, xmax], XMARGIN=[10,4], $
        XTICKS=1,  XSTYLE=1, color = -1  ,/NODATA ;, /YLOG ; white, box only
 
+  oplot,rad_freqs[indx_goodflag],abs_y[indx_goodflag],psym=6,color = colors_inside[1] ;green
   oplot,rad_freqs[indx_goodflag],abs_hx[indx_goodflag],psym=7, color = colors_inside[0] ; red
 
-  oplot,rad_freqs[indx_goodflag],abs_y[indx_goodflag],psym=6,color = colors_inside[1] ;green
-
-  tstring = ['Abs(Reconstructed Vis.)', 'Abs(Measured Vis.)']
+  tstring = ['Abs(Measured Vis.)','Abs(Reconstructed Vis.)']
   tlinestyle= [0,0]
   tsym= [7, 6]
   if (keyword_set(indx_badflag)) then if (min(indx_badflag) GE 0) then begin
      tstring = ['Abs(Reconstructed Vis.)', 'Abs(Measured Vis.)','Flagged data']
      tlinestyle= [0,0,0]
      tsym= [7, 6, 6]
-     oplot, rad_freqs[indx_badflag],abs_hx[indx_badflag],psym=7, color = colors_inside[3] ;blue
      oplot,rad_freqs[indx_badflag],abs_y[indx_badflag],psym=6,color = colors_inside[3] ;blue
+     oplot, rad_freqs[indx_badflag],abs_hx[indx_badflag],psym=7, color = colors_inside[3] ;blue
   endif
 
   !P.COLOR=-1
@@ -241,10 +240,10 @@ PRO WISARD_PLOT_FIT,RAD_FREQS = rad_freqs, ABS_HX = abs_hx, ABS_Y = abs_y, $
 
   !P.POSITION=[0.05,0.1,0.95,0.3]
   plot,clot_freqs,T3DATA, color=-1,  XRANGE = [0, max(clot_freqs)*1.05], /NODATA
-  oplot, clot_freqs, T3XDATA,psym=7,color =colors_inside[0] 
-  oplot,clot_freqs,T3DATA, color=colors_inside[1] , psym=6
+  oplot,clot_freqs,T3DATA, color=colors_inside[1] , psym=6 ; green
+  oplot, clot_freqs, T3XDATA,psym=7,color =colors_inside[0] ; red
 ;  oplot, clot_freqs, T3CMDATA, color=colors_inside[1], psym=5
-  tstring = ['Closure derived from current image','Measured closures'];, 'Closure from initial cmdata',]
+  tstring = ['Measured closures','Reconstructed closures'];, 'Closure from initial cmdata',]
   tlinestyle= [0,0];,0]           ;
   tsym= [7, 6];, 5]
   wis_legend, tstring, line = tlinestyle, psym = tsym, color = colors_inside, /bottom, /left, clear = clear
