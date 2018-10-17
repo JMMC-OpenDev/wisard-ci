@@ -131,7 +131,7 @@ IF NOT keyword_set(psd) THEN message, 'PSD absente.'
 dim2 = 1. * n_elements(ft_object)
 
 IF keyword_set(gradient_o) THEN  $
-    gradient_o = dim2 * real(fft((ft_object - ft_mean_o)/psd, 1))
+    gradient_o = dim2 * real_part(fft((ft_object - ft_mean_o)/psd, 1))
 
 return, (dim2^2/2.) * total( abs2(ft_object - ft_mean_o)/psd )
 
