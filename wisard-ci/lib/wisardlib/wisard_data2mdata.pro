@@ -224,7 +224,7 @@ IF (keyword_set(H) AND keyword_set(guess) AND (operators.n_tels EQ 3)) THEN BEGI
    
    struct = replicate({resphi:dblarr(n_bases), resphierr:dblarr(n_bases), $
                        achix:dcomplexarr(n_bases), visy:dcomplexarr(n_bases)}, n_dat)
-   arg_hx = angle(achix)
+   arg_hx = atan(achix,/phase)
    dataphi = mdata.visphi;operators.dagC#data.clot
    struct.resphi = arg_hx-dataphi
    struct.resphierr = mdata.visphierr
