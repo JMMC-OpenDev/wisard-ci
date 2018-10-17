@@ -260,10 +260,10 @@
 ;
 ;       AUX_OUTPUT.WEIGHTS_CONSTANT : Structure,field of the AUX_OUTPUT
 ;                                     structure. Its fields are:
-;                    RE_Y_DATA:                  real(cmdata.vis)
+;                    RE_Y_DATA:                  real_part(cmdata.vis)
 ;                    IM_Y_DATA:                  imaginary(cmdata.vis)
 ;                    ABS_Y_DATA:                 abs(cmdata.vis)
-;                    ARG_Y_DATA:                 angle(cmdata.vis)
+;                    ARG_Y_DATA:                 atan(cmdata.vis,/phase)
 ;                    W11, W12, W22               see doc scientifique
 ;                    W_RAD:                      -> see cmdata.w_rad  
 ;                    W_TAN:                      -> see cmdata.w_tan  
@@ -451,7 +451,8 @@ FUNCTION WISARD, masterDataArray,  $
                  AUX_OUTPUT = aux_output, CHI2CRIT = chi2crit, $
                  DISPLAY = display, LUT = lut, $ 
                  VERSION = version, HELP = help, $
-                 COPYRIGHT = copyright, USE_FLAGGED_DATA=use_flagged_data, DEBUG=debug, _EXTRA=ex
+                 COPYRIGHT = copyright, USE_FLAGGED_DATA=use_flagged_data, $
+                 DEBUG=debug, _EXTRA=ex
   
  ;; for tests: 
    t_fminop=0d;
@@ -493,7 +494,7 @@ FUNCTION WISARD, masterDataArray,  $
   ENDIF
   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; FABRICATION DONNEES COMPLEXES MYOPES et matrice H
+;;; FABRICATION DONNEES COMPLEXES MYOPES et matrice HMATRIX
 ;;; --- version multi-configurations ---
 ;;;
 
@@ -509,7 +510,7 @@ FUNCTION WISARD, masterDataArray,  $
   for dindex=nd-1,0,-1 do begin
      iloop++
      data=(*masterDataArray[dindex])
-     
+
      mdata = WISARD_DATA2MDATA(data, OPERATORS = operators, VERSION = version,_EXTRA=ex)
 
      ; save operators for the 1st loop as this is the master operator (max number of telescopes)
@@ -519,7 +520,7 @@ FUNCTION WISARD, masterDataArray,  $
      cmdata = WISARD_MDATA2CMDATA(mdata, OPERATORS = operators, VERSION = version,_EXTRA=ex)
      
      cloture_from_data= reform(data.clot, n_elements(data.clot))                                                                                                       
-     cloture_from_cmdata=angle(multiply_phasors(cmdata.vis,operators.C)) & cloture_from_cmdata=reform(cloture_from_cmdata, n_elements(cloture_from_cmdata),/OVERWRITE) 
+     cloture_from_cmdata=atan(multiply_phasors(cmdata.vis,operators.C),/phase) & cloture_from_cmdata=reform(cloture_from_cmdata, n_elements(cloture_from_cmdata),/OVERWRITE) 
      
      allclots_from_data=(iloop)?cloture_from_data:[allclots_from_data,cloture_from_data]
      allclots_from_cmdata=(iloop)?cloture_from_cmdata:[allclots_from_cmdata,cloture_from_cmdata]
@@ -590,25 +591,22 @@ FUNCTION WISARD, masterDataArray,  $
 ; temporary rename to avoid retyping
   cmdata=allcmdata
   operators=master_operators
-
-; print size of problem
-  print,'Wisard is attempting to reconstruct a '+strcompress(n_elements(cmdata.w_rad)*np_min^2)+' problem. (double complex values)'
-
 ;
-  H=WISARD_MAKE_H(FREQS_U=freqs_u, FREQS_V=freqs_v,$
+  HMATRIX=WISARD_MAKE_H(FREQS_U=freqs_u, FREQS_V=freqs_v,$
                   OVERSAMPLING = oversampling,$
                   FOV = fov, NP_MIN = np_min,$
                   ORIGIN = origin, $ 
                   NP_OUTPUT = NP, STEP_OUTPUT = step_output, /verbose, VERSION = version)
-                      
-  print,'Final problem size is '+strcompress(n_elements(H))
+
+; print size of problem
+  print,'Wisard problem size is '+strtrim(n_elements(HMATRIX)*16LL,2)+' bytes.' ; 16 because of complex doubles
 
 ;;; DROP THIS FOR THE TIME BEING! ;;;;  
 ;;;;;;;;;;Rebuild in case NT=3, to avoid integer ambiguities
 ;;;  IF ((operators.n_tels EQ 3) AND (n_elements(guess) gt 0 )) THEN BEGIN
 ;;;     print, '3T case'
 ;;;     IF n_elements(guess) gt 0 THEN nguess = congrid(guess, NP, NP,/center,/interp)  > 0
-;;;     mdata = WISARD_DATA2MDATA(data, OPERATORS = operators, MATH = H, guess = nguess, VERSION = version)
+;;;     mdata = WISARD_DATA2MDATA(data, OPERATORS = operators, MATH = HMATRIX, guess = nguess, VERSION = version)
 ;;;     cmdata = WISARD_MDATA2CMDATA(mdata, OPERATORS = operators, VERSION = version)  
 ;;;  ENDIF
 
@@ -617,9 +615,8 @@ FUNCTION WISARD, masterDataArray,  $
 ;;; INITIALISATIONS
 ; Initialisation of default object: dirty map, or guess if given, with positivity
 ; inverse FT of myopic complex visibilities:
-  dirty_map=0
-  a=(conj(H))[indx_goodflag,*]
-  b=(reform(cmdata.vis,(size(H))[1]))[indx_goodflag]
+  a=(conj(HMATRIX))[indx_goodflag,*]
+  b=(reform(cmdata.vis,(size(HMATRIX))[1]))[indx_goodflag]
   dirty_map=matrix_multiply(a,b,/ATRANSPOSE)
   a=0
   b=0
@@ -627,7 +624,8 @@ FUNCTION WISARD, masterDataArray,  $
   ncmdata=n_elements(cmdata)
 
 
-  dirty_beam = real(dirty_map, VERSION = version) > 0
+  dirty_beam = real_part(dirty_map) > 0
+  dirty_map=0
 
  ; taper with gaussian ?
  ; taper = PSF_GAUSSIAN( Npixel=NP, FWHM=[NP/4,NP/4], /NORMAL )
@@ -647,16 +645,18 @@ FUNCTION WISARD, masterDataArray,  $
         nguess = reform(dirty_beam,NP,NP)
      endif
   ENDIF
+  dirty_beam=0
+
   nguess = nguess/total(nguess) ; saved in aux_output.
   x = reform(nguess, n_elements(nguess))
 
   alpha = randomn(seed, operators.n_tels-1, ncmdata)*0D ;
 
 ;Use pointers for a faster passage of variables
-  re_y_data = PTR_NEW(real(cmdata.vis), /NO_COPY)
+  re_y_data = PTR_NEW(real_part(cmdata.vis), /NO_COPY)
   im_y_data = PTR_NEW(imaginary(cmdata.vis), /NO_COPY)
   abs_y_data = abs(cmdata.vis)
-  arg_y_data = angle(cmdata.vis)
+  arg_y_data = atan(cmdata.vis,/phase)
   w11 = PTR_NEW(cmdata.w_rad*abs2(COS(arg_y_data)) $
                 +cmdata.w_tan*abs2(SIN(arg_y_data)), /NO_COPY)
   w22 = PTR_NEW(cmdata.w_tan*abs2(COS(arg_y_data)) $
@@ -749,8 +749,8 @@ FUNCTION WISARD, masterDataArray,  $
   ENDIF
 
 ; optimize: compute it only once.
-  ones=replicate(1.,n_elements(H[0,*]))
-  
+  ones=replicate(1.,n_elements(HMATRIX[0,*]))
+
 ;; progressive use of recontructed image. assuming final image contrast
 ;; is 'contrast', enable it by successive steps, retaining more pixels
 ;; everytime.
@@ -758,7 +758,7 @@ FUNCTION WISARD, masterDataArray,  $
 ;  contrast_step=contrast/nbiter 
 ;  current_contrast=1.0
 
-;a=tic()
+
   WHILE ((iter LT nbiter) AND (conv GE epsilon) AND (continue)) DO BEGIN
      
      if (VERBOSE_TEST) THEN print, ' ********* iter : ', iter
@@ -770,20 +770,22 @@ FUNCTION WISARD, masterDataArray,  $
      norm_x = x*factor
      
      if (VERBOSE_TEST) THEN print, ' rms(map x) : ',stddev(x)
+;; progressive use of recontructed image. Does not significantly
+;; speed up things.
 ;     count=0
 ;     while(count lt 1) do begin
 ;      current_threshold=1./current_contrast
-;      w2=where(norm_x gt current_threshold/NP^2, count) & print,NP^2,current_threshold,count
+;      w2=where(norm_x gt current_threshold/NP^2, count) ;& print,NP^2,current_threshold,count
 ;      current_contrast+=contrast_step
 ;     endwhile
 ;     norm_x2=norm_x[w2]
-;     H2=H[*,w2]
-;     achix = reform(H2#norm_x2, operators.n_bases, ncmdata) ; TF de norm_x (guess au depart, resultat de boucle ensuite)  
+;     HMATRIX2=HMATRIX[*,w2]
+;     achix = reform(HMATRIX2#norm_x2, operators.n_bases, ncmdata) ; TF de norm_x (guess au depart, resultat de boucle ensuite)  
 
-     achix = reform(H#norm_x, operators.n_bases, ncmdata) ; TF de norm_x (guess au depart, resultat de boucle ensuite)  
+     achix = reform(HMATRIX#norm_x, operators.n_bases, ncmdata) ; TF de norm_x (guess au depart, resultat de boucle ensuite)  
      abs_hx = abs(achix) 
      abs2_hx = abs2(achix)
-     arg_hx = angle(achix)
+     arg_hx = atan(achix,/phase)
 
      wx1 = abs2_hx*(cmdata.w_tan-cmdata.w_rad)
      wx2 = 2D*abs_hx*abs_y_data*cmdata.w_rad
@@ -792,7 +794,7 @@ FUNCTION WISARD, masterDataArray,  $
 
      IF (display NE 0) THEN BEGIN
         mult_phasors=multiply_phasors(achix,operators.C)
-        cloture_from_current_x = angle(mult_phasors) & cloture_from_current_x = reform(cloture_from_current_x, n_elements(cloture_from_current_x),/overwrite)         
+        cloture_from_current_x = atan(mult_phasors,/phase) & cloture_from_current_x = reform(cloture_from_current_x, n_elements(cloture_from_current_x),/overwrite)         
 
         wset, display+1
         WISARD_PLOT_FIT, RAD_FREQS = rad_freqs,$ 
@@ -817,18 +819,21 @@ FUNCTION WISARD, masterDataArray,  $
               _BALPHA = _Balpha, $
               WEIGHTS_CONSTANT = weights_constant, WEIGHTS_X = weights_x, $
               CRIT_ARRAY = crit_array, $
-              OPERATORS = operators, CHI2CRIT = chi2crit, VERSION = version
+              OPERATORS = operators, CHI2CRIT = chi2crit, VERSION = version, $
+              MEMORY=3
+
      if keyword_set(print_times) then print,'  Time: FMIN_OP(alpha) : ',SYSTIME(/SECONDS )-t
 
      ;; MIN of x, possibly with positivity constraint   
      
      ; build ph matrix (fast method): 
-     ph=H*(REFORM(EXP(!dI*(operators._B#alpha)),operators.n_bases*ncmdata,/overwrite)#ones)
+     ph=HMATRIX*(REFORM(EXP(!dI*(operators._B#alpha)),operators.n_bases*ncmdata,/overwrite)#ones)
    
      ;Use pointers for a faster passage of variables
-     weights_alpha = {re_ph:PTR_NEW(real(ph), /NO_COPY), im_ph:PTR_NEW(imaginary(ph), /NO_COPY)}
+     weights_alpha = {re_ph:PTR_NEW(real_part(ph), /NO_COPY), im_ph:PTR_NEW(imaginary(ph), /NO_COPY)}
      
      ;; minimisation over X
+
      FMIN_OP, x, error, FUNC = 'wisard_jtotal_x', LIBRARY = library, $
               /ALLTHEWAY, CONV_THRESHOLD = epsilon/2D, $
               ITMAX = itmax_x,  $
@@ -836,7 +841,8 @@ FUNCTION WISARD, masterDataArray,  $
               WEIGHTS_CONSTANT = weights_constant, $
               WEIGHTS_ALPHA = weights_alpha, $
               PRIOR = prior, CRIT_ARRAY = crit_array, $
-              OPERATORS = operators, CHI2CRIT = chi2crit, VERSION = version
+              OPERATORS = operators, CHI2CRIT = chi2crit, VERSION = version, $
+              MEMORY=3
 
      if keyword_set(print_times) then BEGIN
       t_fminop=t_fminop+SYSTIME(/SECONDS )-t
@@ -868,9 +874,9 @@ FUNCTION WISARD, masterDataArray,  $
               nbr2str(total(crit_array[1]), format = '(F25.4)')
      ENDIF
   
-;print,toc(a)
-
   ENDWHILE
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; POST-PROCESSING
@@ -878,10 +884,10 @@ FUNCTION WISARD, masterDataArray,  $
   factor = 1D/total(x)
 ; print,  'factor', factor
   norm_x = x*factor
-  achix = (reform(H#norm_x, operators.n_bases, ncmdata)) ; TF
+  achix = (reform(HMATRIX#norm_x, operators.n_bases, ncmdata)) ; TF
   abs_hx = abs(achix)
   abs2_hx = abs2(achix, VERSION = version)
-  arg_hx = angle(achix, VERSION = version)
+  arg_hx = atan(achix,/phase)
 
   wx1 = abs2_hx*(cmdata.w_tan-cmdata.w_rad)
   wx2 = 2D*abs_hx*abs_y_data*cmdata.w_rad
@@ -891,7 +897,7 @@ FUNCTION WISARD, masterDataArray,  $
   IF (display NE 0) THEN BEGIN
      wset, display+1
         mult_phasors=multiply_phasors(achix,operators.C)
-        cloture_from_current_x = angle(mult_phasors) & cloture_from_current_x = reform(cloture_from_current_x, n_elements(cloture_from_current_x),/overwrite)         
+        cloture_from_current_x = atan(mult_phasors,/phase) & cloture_from_current_x = reform(cloture_from_current_x, n_elements(cloture_from_current_x),/overwrite)         
         WISARD_PLOT_FIT, RAD_FREQS = rad_freqs,$ 
                          ABS_HX = reform(abs_hx, n_elements(abs_hx)), $
                          ABS_Y  = reform(weights_constant.abs_y_data, n_elements(abs_hx)), $
