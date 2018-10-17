@@ -245,15 +245,15 @@ END
 ;sqnpix = sqrt(npix)
 ;TH = conj(transpose(H))
 ;dirty_map = TH#reform(cmdata.vis,(size(H))[1])
-;xdm = randomn(seed, (size(H))[2])*10D;real(dirty_map) >0
+;xdm = randomn(seed, (size(H))[2])*10D;real_part(dirty_map) >0
 ;;aff, rotate(reform(xdm, sqnpix, sqnpix),5)
 ;alpha = randomn(seed, operators.n_tels-1, n_elements(cmdata))*1D
 ;
 ;
-;re_y_data = real(cmdata.vis)
+;re_y_data = real_part(cmdata.vis)
 ;im_y_data = imaginary(cmdata.vis)
 ;abs_y_data = abs(cmdata.vis)
-;arg_y_data = angle(cmdata.vis)
+;arg_y_data = atan(cmdata.vis,/phase)
 ;
 ;w11 = cmdata.w_rad*abs2(COS(arg_y_data)) $
 ;      +cmdata.w_tan*abs2(SIN(arg_y_data))
@@ -269,7 +269,7 @@ END
 ;achix = reform(H#xdm, operators.n_bases, n_elements(cmdata))
 ;abs_hx = abs(achix)
 ;abs2_hx = abs2(achix)
-;arg_hx = angle(achix)
+;arg_hx = atan(achix,/phase)
 ;
 ;wx1 = abs2_hx*(cmdata.w_tan-cmdata.w_rad)
 ;wx2 = 2D*abs_hx*abs_y_data*cmdata.w_rad
@@ -285,7 +285,7 @@ END
 ;
 ;P = EXP(!dI*reform(delta_alpha, operators.n_bases*n_elements(cmdata)))
 ;ph = diag(P)#H
-;re_ph = real(H)
+;re_ph = real_part(H)
 ;im_ph = imaginary(H)
 ;dummix = WISARD_JDATA_X(xdm , RE_PH = re_ph, IM_PH = im_ph, RE_Y_DATA = $
 ;                        re_y_data, IM_Y_DATA = im_y_data, W11 = w11, W12 = w12, W22 = w22)
