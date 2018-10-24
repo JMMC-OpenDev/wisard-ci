@@ -286,27 +286,20 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
          endfor
       endfor
 ;;      ; keep differential info: NOT STANDARD YET!
-;;      if nbWlen le 1 or keyword_set(noflatten) then begin
-;;         vis2=transpose(vis2)&vis2err=transpose(vis2err)&vis2flag=transpose(vis2flag)&clot=transpose(clot)&cloterr=transpose(cloterr)
-;;         clotflag=transpose(clotflag)&freqs_u=transpose(freqs_u)&freqs_v=transpose(freqs_v)&wlen=transpose(wlen) 
-;;         struct={vis2:vis2*1D, vis2err:vis2err*1D, vis2flag:vis2flag, clot:clot*1D, cloterr:cloterr*1D, clotflag:clotflag, freqs_u:freqs_u*1D, freqs_v:freqs_v*1D, wlen:wlen*1D}
-;;         if (hasOiVis) then begin
-;;            visphi=transpose(visphi)&visphierr=transpose(visphierr)&visflag=transpose(visflag) 
-;;            struct={vis2:vis2*1D, vis2err:vis2err*1D, vis2flag:vis2flag, clot:clot*1D, cloterr:cloterr*1D, clotflag:clotflag, freqs_u:freqs_u*1D, freqs_v:freqs_v*1D, wlen:wlen*1D, visphi:visphi*1D, visphierr:visphierr*1D, visflag:visflag }
-;;         endif
-;;         if (total(size(outdata)) LT 1) then begin
-;;            desiredSize=ntimes
-;;            outdata=replicate(struct,desiredSize)
-;;         endif else begin
-;;            if total(size(outdata[0].clot,/dim) ne  size(struct[0].clot,/dim)) gt 0 then begin
-;;               if (free_numberoftels) then warnHasIncompatibleConfigurations++
-;;               goto, FAILED_TO_ADD_STRUCT
-;;            endif
-;;            outdata[strindex]=struct
-;;         endelse
-;;         strindex++
-;;      ; NORMAL PROCESSING: FLATTEN: all wavelength independent.
-;;      endif else begin ; FLATTEN (default) or nbwlen==1
+      if nbwlen gt 1 and keyword_set(noflatten) then begin
+         vis2=transpose(vis2)&vis2err=transpose(vis2err)&vis2flag=transpose(vis2flag)&clot=transpose(clot)&cloterr=transpose(cloterr)&clotflag=transpose(clotflag)&freqs_u=transpose(freqs_u)&freqs_v=transpose(freqs_v)
+         print,format='(%"Data for time %f has %d closures and %d v2 retained for %d wavelengths.")',*bundle[0,0],nClot,nClot*3,nbwlen
+
+         struct={vis2:vis2*1D, vis2err:vis2err*1D, vis2flag:vis2flag, clot:clot*1D, cloterr:cloterr*1D, clotflag:clotflag, freqs_u:freqs_u*1D, freqs_v:freqs_v*1D, wlen:wlen*1D}
+;;;         if (hasOiVis) then begin
+;;;            visphi=transpose(visphi)&visphierr=transpose(visphierr)&visflag=transpose(visflag) 
+;;;            struct={vis2:vis2*1D, vis2err:vis2err*1D, vis2flag:vis2flag, clot:clot*1D, cloterr:cloterr*1D, clotflag:clotflag, freqs_u:freqs_u*1D, freqs_v:freqs_v*1D, wlen:wlen*1D, visphi:visphi*1D, visphierr:visphierr*1D, visflag:visflag }
+;;;         endif
+         ; save in pointer
+         temporarySubproduct[iTime]=ptr_new(struct)
+
+      ; NORMAL PROCESSING: FLATTEN: all wavelength independent.
+      endif else begin ; FLATTEN (default) or nbwlen==1
          vis2=transpose(reform(vis2, nbWlen, nbases,/overwrite))
          vis2err=transpose(reform(vis2err, nbWlen, nbases,/overwrite))
          vis2flag=transpose(reform(vis2flag, nbWlen, nbases,/overwrite))
@@ -336,6 +329,7 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
 ;;;         endif else begin
 
             print,format='(%"Data for time %f has %d closures and %d v2 retained.")',*bundle[0,0],nClot*nbwlen,nClot*3*nbwlen
+
             struct={vis2:vis2[*,0]*1D, vis2err:vis2err[*,0]*1D, vis2flag:vis2flag[*,0], clot:clot[*,0]*1D, cloterr:cloterr[*,0]*1D, clotflag:clotflag[*,0], freqs_u:freqs_u[*,0]*1D, freqs_v:freqs_v[*,0]*1D, wlen:wlen[0]*1D}
             desiredSize=nbWlen
             strindex=1
@@ -347,14 +341,15 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
             temporarySubproduct[iTime]=ptr_new(outdata)
 
 ;;;         endelse
-;;
-;;      endelse
-;;
+
+       endelse
+
 FAILED_TO_ADD_STRUCT:
       delvarx,vis2,vis2err,clot,cloterr,freqs_u,freqs_v,vis2flag,clotflag,wlen,struct
 ;;;      if (hasOiVis) then delvarx,visphi, visphierr, visflag
 NOT_GOOD_ENOUGH:
    endfor
+
    finalProduct=ptrarr(MAXTEL-3) ; ntels=index+3=[3..MAXTEL]
    numberOfDataPerConfig=intarr(MAXTEL-3)
    ; for each existing configuration, find the size needed to add the exiting structures:
