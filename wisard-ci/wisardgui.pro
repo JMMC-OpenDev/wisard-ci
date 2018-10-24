@@ -67,7 +67,7 @@
 ;
 ;-
 
-pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,delta=delta,_extra=ex,help=help
+pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,delta=delta,average=binsize,_extra=ex,help=help
 
 ; if /display option, we are interactive
 @ "wisard_common.pro"
@@ -101,6 +101,8 @@ end
   dowaverange=n_elements(waverange) ne 0
   doScale=n_elements(scale) ne 0
   doDelta=n_elements(delta) ne 0
+  doAverage=n_elements(binsize) ne 0
+
   if dotarget then passed_target=target 
   if dothreshold then passed_threshold=threshold
   if donbiter then passed_nbiter=nbiter
@@ -112,7 +114,7 @@ end
   if doScale then passed_scale=scale
   if doDelta then passed_delta=delta
 
-
+  if doAverage then noflatten=1 else noflatten=0
 
  ; after catch to handle this first error message if necessary. 
   if (~strmatch(!PATH,'*wisardlib*')) then begin
@@ -398,10 +400,11 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
   for i=0,n_elements(oit3arr)-1 do t3inst[i]=(where(sxpar(*oit3headarr[i],"INSNAME") eq allinsnames))[0]
 
 ; all values defined,  get new data structure
-  masterDataArray=wisard_oifits2data(input,targetname=target,_extra=ex)
+  masterDataArray=wisard_oifits2data(input,targetname=target,noflatten=noflatten,_extra=ex)
 ; drop void data in masterData 
   www=where(ptr_valid(masterDataArray),numberOfConfigurations)
   masterDataArray=masterDataArray[www]
+
 ; individually check an trim each data structure
   someDataIsAvailable=0
   someRangeIsAvailable=long(wave_min eq wave_max) ; 1 if we do not select any wave range.
@@ -430,8 +433,8 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
            endif
         endif
      endif else begin
-        total_wave_min=min([total_wave_min,data.wlen])        
-        total_wave_max=max([total_wave_max,data.wlen])        
+        total_wave_min=min([total_wave_min,min(data.wlen)]) ; is OK with and without the /NOFLATTEN 3rd dimension.        
+        total_wave_max=max([total_wave_max,max(data.wlen)])        
      endelse
   endfor
   
@@ -462,7 +465,26 @@ end
  if (doDelta) then commandline+=',delta='+strtrim(string(delta),2)
   print,commandline
 
-; start reconstruction. TODO case wrt rgl_name/prior
+;----------------------------------------------------------------------
+; Here is the point where one can possibly:
+; create a wavelength subset;
+; average channels to have less points and be faster (or keep within
+; available memory)
+; produce an external format suitable for input to, e.g., PAINTER.
+; flatten all data and just make one grey image
+; loop on various channels to make a data cube (each channel
+; reconstructed "independently", but probably clever to have a gray
+; image first)
+; change Wisard to take into account VISAMP and VISPHI and become
+; truly 3D.
+;----------------------------------------------------------------------
+
+; simple example: average in bins
+  if (doAverage) then wisard_average_data,masterDataArray,binsize
+
+; finally flatten (default)
+  wisard_flatten_data,masterDataArray
+
 ; TOTVAR is just delta=very_small. 
   case regul of
 
