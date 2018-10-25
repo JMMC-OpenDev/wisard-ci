@@ -751,14 +751,6 @@ FUNCTION WISARD, masterDataArray,  $
 ; optimize: compute it only once.
   ones=replicate(1.,n_elements(HMATRIX[0,*]))
 
-;; progressive use of recontructed image. assuming final image contrast
-;; is 'contrast', enable it by successive steps, retaining more pixels
-;; everytime.
-;  contrast=1000
-;  contrast_step=contrast/nbiter 
-;  current_contrast=1.0
-
-
   WHILE ((iter LT nbiter) AND (conv GE epsilon) AND (continue)) DO BEGIN
      
      if (VERBOSE_TEST) THEN print, ' ********* iter : ', iter
@@ -770,19 +762,9 @@ FUNCTION WISARD, masterDataArray,  $
      norm_x = x*factor
      
      if (VERBOSE_TEST) THEN print, ' rms(map x) : ',stddev(x)
-;; progressive use of recontructed image. Does not significantly
-;; speed up things.
-;     count=0
-;     while(count lt 1) do begin
-;      current_threshold=1./current_contrast
-;      w2=where(norm_x gt current_threshold/NP^2, count) ;& print,NP^2,current_threshold,count
-;      current_contrast+=contrast_step
-;     endwhile
-;     norm_x2=norm_x[w2]
-;     HMATRIX2=HMATRIX[*,w2]
-;     achix = reform(HMATRIX2#norm_x2, operators.n_bases, ncmdata) ; TF de norm_x (guess au depart, resultat de boucle ensuite)  
 
      achix = reform(HMATRIX#norm_x, operators.n_bases, ncmdata) ; TF de norm_x (guess au depart, resultat de boucle ensuite)  
+
      abs_hx = abs(achix) 
      abs2_hx = abs2(achix)
      arg_hx = atan(achix,/phase)
