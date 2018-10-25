@@ -229,6 +229,6 @@ IF (n_params() EQ 2) THEN BEGIN
 ENDIF
 
 if (print_times) THEN print,'   > wisard_jtotal_x : TOTAL: ',SYSTIME(/SECONDS )-t_global
-
-return, total(crit_array)
+total=total(crit_array)
+if finite(total) then return, total(crit_array) else message,"Nan (Not-A-Number) criterium implied bad DATA. Did you Flag correctly your data?"
 END
