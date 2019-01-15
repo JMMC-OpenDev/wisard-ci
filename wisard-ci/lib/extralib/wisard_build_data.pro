@@ -118,7 +118,7 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
                wherenan=where(~finite(thet3phierr), nancount) & if(nancount GT 0) then thet3flag[wherenan]=1
 ;            w=where(thet3flag eq 0,/null) ; /NULL to avoid the -1
 ;            problem: gdl not ready!
-               w=where(thet3flag eq 1, count) & if (count gt 0) then errsample[iclot]=mean(thet3phierr[w]) else errsample[iClot]=!values.d_infinity
+               w=where(thet3flag eq 0, count) & if (count gt 0) then errsample[iclot]=mean(thet3phierr[w]) else errsample[iClot]=!values.d_infinity
             endfor
                                 ; clotlist is the list of 'best' closures
             clotlist=((indgen(nclot))[sort(errsample)])[0:nindeptclostheoric-1]
@@ -159,12 +159,9 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
                
                thet3phi=sign*[*(*bundle[iClot,2])]*!DPI/180D
                thet3phierr=[*(*bundle[iClot,3])]*!DPI/180D
-               thet3flag=*(*bundle[iClot,4])
-               www=where(thet3flag eq 70, count) & if (count GT 0) then thet3flag[www]=0
-               www=where(thet3flag eq 84, count) & if (count GT 0) then thet3flag[www]=1
-               
-               wherenan=where(~finite(thet3phi), nancount) & if(nancount GT 0) then thet3flag[wherenan]=1  
-               wherenan=where(~finite(thet3phierr), nancount) & if(nancount GT 0) then thet3flag[wherenan]=1  
+               thet3flag=(*(*bundle[iClot,4]) eq 84) ; ascii 'T'
+               wherenan=where(~finite(thet3phierr), nancount) & if(nancount GT 0) then thet3flag[wherenan]=1
+               wherenan=where(~finite(thet3phi), nancount) & if(nancount GT 0) then thet3flag[wherenan]=1
                clot=(total(size(clot)) LT 1)?[thet3phi]:[[clot],[thet3phi]]
                cloterr=(total(size(cloterr)) LT 1)?[thet3phierr]:[[cloterr],[thet3phierr]]
                clotflag=(total(size(clotflag)) LT 1)?[thet3flag]:[[clotflag],[thet3flag]]
@@ -224,12 +221,10 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
                   if (verbose gt 2) then print,format='(%"found code %s at base %d of closure %d")',oucode1,K,iClot
                   thevis2=[*(*bundle[iClot,5])[K]]
                   thevis2err=[*(*bundle[iClot,6])[K]]
-                  thevis2flag=*(*bundle[iClot,7])[K]
-                  www=where(thevis2flag eq 70, count) & if (count GT 0) then thevis2flag[www]=0
-                  www=where(thevis2flag eq 84, count) & if (count GT 0) then thevis2flag[www]=1
+                  thevis2flag=(*(*bundle[iClot,7])[K] eq 84) ; ascii 'T'
 
-                  wherenan=where(~finite(thevis2), nancount) & if(nancount GT 0) then thevis2flag[wherenan]=1
                   wherenan=where(~finite(thevis2err), nancount) & if(nancount GT 0) then thevis2flag[wherenan]=1
+                  wherenan=where(~finite(thevis2), nancount) & if(nancount GT 0) then thevis2flag[wherenan]=1
 
                   vis2err=(total(size(vis2err)) LT 1)?[thevis2err]:[[vis2err],[thevis2err]]
                   vis2=(total(size(vis2)) LT 1)?[thevis2]:[[vis2],[thevis2]]
@@ -238,9 +233,7 @@ function wisard_build_data,data,verbose=verbose, noflatten=noflatten, numberofte
                   ;;   thevisphi=[*(*bundle[iClot,12])[K]]*!DPI/180.0
                   ;;   thevisphierr=[*(*bundle[iClot,13])[K]]*!DPI/180.0
                   ;;   thevisflag=*(*bundle[iClot,14])[K]
-                  ;;   www=where(thevisflag eq 70, count) & if (count GT 0) then thevisflag[www]=0
-                  ;;   www=where(thevisflag eq 84, count) & if (count GT 0) then thevisflag[www]=1
-                  ;;
+                  ;;   www=where(thevisflag eq 70, count) & etc..
                   ;;   wherenan=where(~finite(thevisphi), nancount) & if(nancount GT 0) then thevisflag[wherenan]=1
                   ;;   wherenan=where(~finite(thevisphierr), nancount) & if(nancount GT 0) then thevisflag[wherenan]=1
                   ;;
