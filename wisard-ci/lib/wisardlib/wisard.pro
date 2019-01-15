@@ -591,6 +591,20 @@ FUNCTION WISARD, masterDataArray,  $
 ; temporary rename to avoid retyping
   cmdata=allcmdata
   operators=master_operators
+
+; for some reason some cmdata.vis can still be NaN!
+  w=where(~finite(cmdata.vis),count) & if (count gt 0) then begin
+     print,"Warning, correcting "+strtrim(count,2)+" Myopic Complex Data that are NaN, please check input file values." 
+     vis_0=cmdata.vis
+     vis_0[w]=complex(0,0)
+     cmdata.vis=vis_0
+     w_tan_0=cmdata.w_tan       ; intermediate variable 
+     w_rad_0=cmdata.w_rad       ; intermediaire variable 
+     w_tan_0[w]=0.
+     w_rad_0[w]=0.
+     cmdata.w_tan=w_tan_0
+     cmdata.w_rad=w_rad_0 
+  endif
 ;
   HMATRIX=WISARD_MAKE_H(FREQS_U=freqs_u, FREQS_V=freqs_v,$
                   OVERSAMPLING = oversampling,$
