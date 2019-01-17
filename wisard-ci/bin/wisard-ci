@@ -64,6 +64,7 @@ function printUsage ()
   echo -e "\t-N np_min : number of reconstructed resels."
   echo -e "\t-w [wmin,wmax] : wavelength range, in microns. No blanks in the argument, e.g.: [1.5,3.3] ."
   echo -e "\t-r regularisation name : one of 'TOTVAR','PSD', 'L1L2', 'L1L2WHITE', 'SOFT_SUPPORT' "
+  echo -e "\t-V level : verbosity level [0-3] "
   exit 1
 }
 
@@ -82,27 +83,27 @@ function printVersion ()
 
 
 # Parse command-line parameters
-while getopts "hvdAf:i:n:r:N:w:" option
+while getopts "hvdAi:f:n:N:w:r:V:" option
 do
     case $option in
         h )
             printUsage ;;
         v )
             printVersion ;;
-        f ) # fov
-            FOVCOMMAND=', fov='"$OPTARG"' ';
-	    ;;
         d ) # display
             DISPLAYCOMMAND=', /display ';
+	    ;;
+        A ) # all (flagged and not flagged) data
+            FLAG_COMMAND=', /use_flagged ';
 	    ;;
         i ) # init_image
             INIT_IMAGE_COMMAND=', init_img='\'"$OPTARG"\'' ';
 	    ;;
+        f ) # fov
+            FOVCOMMAND=', fov='"$OPTARG"' ';
+	    ;;
         n ) # nbiter
             NBITER_COMMAND=', nbiter='\'"$OPTARG"\'' ';
-	    ;;
-        r ) # regul
-            REGUL_COMMAND=', regul='\'"$OPTARG"\'' ';
 	    ;;
         N ) # np_min
             NPMIN_COMMAND=', np_min='\'"$OPTARG"\'' ';
@@ -110,8 +111,11 @@ do
         w ) # waverange
             WAVERANGE_COMMAND=', waverange='\'"$OPTARG"\'' ';
 	    ;;
-        A ) # all (flagged and not flagged) data
-            FLAG_COMMAND=', /use_flagged ';
+        r ) # regul
+            REGUL_COMMAND=', regul='\'"$OPTARG"\'' ';
+	    ;;
+        V ) # VERBOSITY
+            VERB_COMMAND=', verb='$OPTARG' ';
 	    ;;
         * ) # Unknown option
             echo "Invalid option -- $option"
@@ -148,11 +152,11 @@ then
 else
   echo "WISARD_CI_VERSION: $WISARD_CI_VERSION"
 
-  # add helper to launch gdl properly. this procedure shoudl insure that the IDL/GDL !PATH contains idlastro procedures (readfits.pro etc).
+  # add helper to launch gdl properly. this procedure should insure that the IDL/GDL !PATH contains idlastro procedures (readfits.pro etc).
   export GDL_STARTUP="gdl_startup.pro"
 fi
 
-WISARDCI_COMMAND="wisardgui,'"$INPUT"','"$OUTPUT"'"${DISPLAYCOMMAND}${FOVCOMMAND}${INIT_IMAGE_COMMAND}${NBITER_COMMAND}${WAVERANGE_COMMAND}${FLAG_COMMAND}${NPMIN_COMMAND}
+WISARDCI_COMMAND="wisardgui,'"$INPUT"','"$OUTPUT"'"${DISPLAYCOMMAND}${FLAG_COMMAND}${INIT_IMAGE_COMMAND}${FOVCOMMAND}${NBITER_COMMAND}${NPMIN_COMMAND}${WAVERANGE_COMMAND}${REGUL_COMMAND}${VERB_COMMAND}
 
 gdl -e "$WISARDCI_COMMAND"
 
