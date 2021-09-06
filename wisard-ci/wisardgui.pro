@@ -71,7 +71,10 @@ pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=f
 
 ; if /display option, we are interactive
 @ "wisard_common.pro"
-wisard_is_interactive =  keyword_set(display)
+
+  if ~keyword_set(display) then display=0
+  wisard_is_interactive =  keyword_set(display)
+
 @ "wisard_catch_noniteractive.pro"
 
 if keyword_set(help) then begin
@@ -87,7 +90,8 @@ end
   message,/informational,"Welcome to Wisard, version "+wisard_ci_version+", you have accepted the copyrights."
   message,/informational,"Wisard is running with "+strcompress(!CPU.TPOOL_NTHREADS)+" threads"+extra_comment+"."
 
-  if wisard_is_interactive then device, decomposed=0, retain=2
+  if wisard_is_interactive then if (!d.name ne "X" and !d.name ne "MAC" ) then display=0
+  if (display) then device, decomposed=0, retain=2
 
   ; memorize passed line values
   dotarget=n_elements(target) ne 0 
@@ -140,7 +144,7 @@ end
 ;; defaults in absence of passed values. Will be updated by the ones
 ;; in the input file, which are superseded by the eventual arguments passed.
   target='*'
-  threshold=1d-6
+  threshold=1d-3
   nbiter=50
   fov=14.0D
   np_min=32L
@@ -458,7 +462,7 @@ if (fov gt maxfov or fov le 0) then begin
 end 
 
 ; format some help/debug line
- commandline='Line equivalent of your command: wisardgui,/display,"'+input+'","'+output+'",target="'+target+'",threshold='+strtrim(string(threshold),2)+',nbiter='+strtrim(string(nbiter),2)+',fov='+strtrim(string(fov),2)+',np_min='+strtrim(string(np_min),2)+',regul="'+regul_name[regul]+'",waverange=['+strtrim(string(wave_min*1E6),2)+','+strtrim(string(wave_max*1E6),2)+']'
+ commandline='Line equivalent of your command: wisardgui,display="'+strtrim(display,2)+','+input+'","'+output+'",target="'+target+'",threshold='+strtrim(string(threshold),2)+',nbiter='+strtrim(string(nbiter),2)+',fov='+strtrim(string(fov),2)+',np_min='+strtrim(string(np_min),2)+',regul="'+regul_name[regul]+'",waverange=['+strtrim(string(wave_min*1E6),2)+','+strtrim(string(wave_max*1E6),2)+']'
  if (doinit_img) then commandline+='",init_img="'+init_img
  if (dorgl_prio) then commandline+='",rgl_prio="'+rgl_prio+'"'
  if (doScale) then commandline+=',scale='+strtrim(string(scale),2)
@@ -491,13 +495,13 @@ end
      0: begin ; L1L2
         if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         if (~doDelta) then delta = 1D
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
 
      1: begin ; L1L2WHITE
         if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         if (~doDelta) then delta = 1D
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
 
      2: begin ; PSD
@@ -508,19 +512,19 @@ end
            distance = double(shift(dist(np_min),np_min/2,np_min/2))
            psd = 1D/((distance^3 > 1D) < 1D6)
         endelse
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
 
      3: begin ; SOFT_SUPPORT
         if ~n_elements(fwhm) then fwhm=10                  ; pixels
         if ~n_elements(mu_support) then mu_support=10.0    ; why not?
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
 
      4: begin ; TOTVAR
         if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         delta = scale/1D9 ; TOTVAR is L1L2 with delta infinitesimal.
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
      
      else: message,"ERROR: regularization not yet supported, FIXME!"
@@ -559,6 +563,9 @@ end
   FXADDPAR,ouput_params_header,'WAVE_MAX',wave_max
   FXADDPAR,ouput_params_header,'LAST_IMG',reconstructed_image_hduname
   FXADDPAR,ouput_params_header,'MAXITER',nbiter
+  FXADDPAR,ouput_params_header,'NITER',aux_output.iter
+  FXADDPAR,ouput_params_header,'CHISQ',aux_output.crit_array[0] ; TBC
+  FXADDPAR,ouput_params_header,'FLUX',total(reconstruction) ; 1.0 . Always ^))
   FXADDPAR,ouput_params_header,'RGL_NAME',regul_name[regul]
   if doScale then FXADDPAR,ouput_params_header,'SCALE',scale
   if doDelta then FXADDPAR,ouput_params_header,'DELTA',delta
