@@ -19,7 +19,9 @@
 ;     MU_SUPPORT=MU_SUPPORT, FWHM=FWHM, WAVERANGE=WAVERANGE,
 ;     SIMULATED_DATA=SIMULATED_DATA,
 ;     USE_FLAGGED_DATA=USE_FLAGGED_DATA,
-;     RECONSTRUCTED_IMAGE=MYIMAGE,SCALE=SCALE,DELTA=DELTA,/HELP
+;     RECONSTRUCTED_IMAGE=MYIMAGE,RGL_WGT=RGL_WGT,DELTA=DELTA,/HELP
+;
+;     'RGL_WGT' was called 'SCALE' (obsoleted) in previous versions
 ;
 ; KEYWORD PARAMETERS:
 ;    INPUT: input OIFITS or (better) OImaging OIFITS file (that contains
@@ -51,8 +53,9 @@
 ;
 ; EXAMPLE:
 ;    wisardgui,"inputdata/2004/2004-FKV1137.fits","output_of_example.fits", $
-;    nbiter=1000,fov=16,np_min=64,waverange=[1.0,5.0],reconstructed_image=myimage, $
-;    regul='L1L2WHITE',/display,/simulated_data
+;    nbiter=1000,fov=16,np_min=64,reconstructed_image=myimage, $
+;    regul='L1L2WHITE',/display,/simulated_data ; + eventually:
+;    ; waverange=[1.0,5.0], guess="myguess.fits" , ...
 ;
 ; NOTE: 
 ;    At the moment, the model visibility will be forced in ALL wavelengths, not only the
@@ -67,7 +70,7 @@
 ;
 ;-
 
-pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,delta=delta,average=binsize,_extra=ex,help=help
+pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,rgl_wgt=rgl_wgt,delta=delta,average=binsize,_extra=ex,help=help
 
 ; if /display option, we are interactive
 @ "wisard_common.pro"
@@ -103,7 +106,7 @@ end
   doinit_img=n_elements(passed_init_img) ne 0
   dorgl_prio=n_elements(rgl_prio) ne 0
   dowaverange=n_elements(waverange) ne 0
-  doScale=n_elements(scale) ne 0
+  doRgl_Wgt=( (n_elements(rgl_wgt) ne 0) or  (n_elements(scale) ne 0) ) ; still accept scale
   doDelta=n_elements(delta) ne 0
   doAverage=n_elements(binsize) ne 0
 
@@ -115,7 +118,13 @@ end
   if doregul then passed_regul=regul
   if dorgl_prio then passed_rgl_prio=rgl_prio
   if dowaverange then passed_waverange=waverange
-  if doScale then passed_scale=scale
+  if doRgl_Wgt then begin
+     if  (n_elements(rgl_wgt) ne 0) then passed_rgl_wgt=rgl_wgt else  begin ;
+        passed_rgl_wgt=scale                                                ;
+        message,/inform,"SCALE is Obsoleted, use RGL_WGT instead"
+     endelse
+  endif
+  
   if doDelta then passed_delta=delta
 
   if doAverage then noflatten=1 else noflatten=0
@@ -147,7 +156,7 @@ end
   threshold=1d-3
   nbiter=50
   fov=14.0D
-  np_min=32L
+  np_min=64L
   regul=default_regul
   wave_min = -1
   wave_max = -1
@@ -166,6 +175,12 @@ end
   hdunames=replicate('',next)
   hdunumbers=indgen(next)
 
+;; special case: only an "IMAGE-OI OUTPUT PARAM" section, will use it
+;; as input param as well
+  w=where(hdunames eq "IMAGE-OI INPUT PARAM", count)
+  if (count gt 0) then hdu_to_read_as_input= "IMAGE-OI INPUT PARAM" else hdu_to_read_as_input= "IMAGE-OI OUTPUT PARAM"
+  
+
 ;read first header
   hdu0=mrdfits(input,0,main_header)
 ;if image, take it as guess (however can be updated afterwards, see below)
@@ -176,7 +191,7 @@ end
 ;
 ;examine others
   for i=1,next do begin
-     if ( extname[i] EQ "IMAGE-OI INPUT PARAM") then begin 
+     if ( extname[i] EQ hdu_to_read_as_input ) then begin 
 ; use a special trick: mrdfits is unable to read this kind of data
 ; where TFIELDS=0. use fits_read with only headers
         fits_read,input,dummy,input_params_header,/header_only,exten_no=i
@@ -237,17 +252,25 @@ end
         req_fov=sxpar(input_params_header,"FOV") 
         if req_fov gt 0 then fov=req_fov
         
-; WISARD: SCALE: WARNING: This is not the same logic. As SCALE default
-; is best computed from the image and NP, wee need to know if a SCALE
+; WISARD: RGL_WGT: WARNING: This is not the same logic. As RGL_WGT default
+; is best computed from the image and NP, wee need to know if a RGL_WGT
 ; was forced either by the commandline or the OIMaging file.
-        if (~doScale) then begin   ; factor for balance between regularization **** and in cost function
-           req_scale=sxpar(input_params_header,"SCALE") 
-           if req_scale gt 0 then begin ; meaning <= 0 will provide the default.
-              scale=req_scale
-              doScale = 1
-           endif
+        if (~doRgl_Wgt) then begin   ; factor for balance between regularization **** and in cost function
+           req_rgl_wgt=sxpar(input_params_header,"RGL_WGT") 
+           if req_rgl_wgt gt 0 then begin ; meaning <= 0 will provide the default.
+              rgl_wgt=req_rgl_wgt
+              doRgl_Wgt = 1
+           endif else begin     ;still save the day if the old 'SCALE' was here
+              req_rgl_wgt=sxpar(input_params_header,"SCALE")
+              message,/inform,"SCALE (FITS header) is now Obsoleted, will be replaced by RGL_WGT in output"
+              if req_rgl_wgt gt 0 then begin 
+                 rgl_wgt=req_rgl_wgt
+                 doRgl_Wgt = 1
+              endif
+           endelse
+           
         endif
-; WISARD: DELTA: WARNIG: Same logic as for SCALE/
+; WISARD: DELTA: WARNIG: Same logic as for RGL_WGT/
         if (~doDelta) then begin   ; factor for balance between regularization **** and in cost function
            req_delta=sxpar(input_params_header,"DELTA") 
            if req_delta gt 0 then begin; meaning <= 0 will provide the default.
@@ -256,8 +279,8 @@ end
            endif
         endif
 
-     endif else if ( extname[i] EQ "IMAGE-OI OUTPUT PARAM") then begin ; idem trick
-; do nothing
+;;     endif else if ( extname[i] EQ "IMAGE-OI OUTPUT PARAM") then begin ; idem trick
+;; already treated
      endif else if extname[i] eq "OI_T3" then begin
         oit3 = ptr_new( mrdfits(input,i,header) )
         oit3head = ptr_new( header )
@@ -465,7 +488,7 @@ end
  commandline='Line equivalent of your command: wisardgui,display="'+strtrim(display,2)+','+input+'","'+output+'",target="'+target+'",threshold='+strtrim(string(threshold),2)+',nbiter='+strtrim(string(nbiter),2)+',fov='+strtrim(string(fov),2)+',np_min='+strtrim(string(np_min),2)+',regul="'+regul_name[regul]+'",waverange=['+strtrim(string(wave_min*1E6),2)+','+strtrim(string(wave_max*1E6),2)+']'
  if (doinit_img) then commandline+='",init_img="'+init_img
  if (dorgl_prio) then commandline+='",rgl_prio="'+rgl_prio+'"'
- if (doScale) then commandline+=',scale='+strtrim(string(scale),2)
+ if (doRgl_Wgt) then commandline+=',rgl_wgt='+strtrim(string(rgl_wgt),2)
  if (doDelta) then commandline+=',delta='+strtrim(string(delta),2)
   print,commandline
 
@@ -493,15 +516,15 @@ end
   case regul of
 
      0: begin ; L1L2
-        if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
+        if (~doRgl_Wgt) then rgl_wgt = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         if (~doDelta) then delta = 1D
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=rgl_wgt, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
 
      1: begin ; L1L2WHITE
-        if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
+        if (~doRgl_Wgt) then rgl_wgt = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         if (~doDelta) then delta = 1D
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=rgl_wgt, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
 
      2: begin ; PSD
@@ -522,9 +545,9 @@ end
      end
 
      4: begin ; TOTVAR
-        if (~doScale) then scale = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
-        delta = scale/1D9 ; TOTVAR is L1L2 with delta infinitesimal.
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=scale, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
+        if (~doRgl_Wgt) then rgl_wgt = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
+        delta = rgl_wgt/1D9 ; TOTVAR is L1L2 with delta infinitesimal.
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=rgl_wgt, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
      
      else: message,"ERROR: regularization not yet supported, FIXME!"
@@ -567,7 +590,7 @@ end
   FXADDPAR,ouput_params_header,'CHISQ',aux_output.crit_array[0] ; TBC
   FXADDPAR,ouput_params_header,'FLUX',total(reconstruction) ; 1.0 . Always ^))
   FXADDPAR,ouput_params_header,'RGL_NAME',regul_name[regul]
-  if doScale then FXADDPAR,ouput_params_header,'SCALE',scale
+  if doRgl_Wgt then FXADDPAR,ouput_params_header,'RGL_WGT',rgl_wgt
   if doDelta then FXADDPAR,ouput_params_header,'DELTA',delta
   FXADDPAR,ouput_params_header,'THRESHOL',threshold
   FXADDPAR,ouput_params_header,'NP_MIN',np_min
