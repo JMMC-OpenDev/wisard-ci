@@ -2,8 +2,8 @@ WISARD-CI: the simplified interface to WISARD.
 
 WISARD (http://www.mariotti.fr/doc/approved/JMMC-MAN-2500-0001.pdf and
 references inside) is a monochromatic image reconstruction program
-developed for JMMC by S. Meimon and L. Mugnier, available under a
-Cecill license (see inside lib/wisard.pro).
+developed for JMMC by S. Meimon and L. Mugnier, available under the
+CeCILL-B license (see LICENSE and See Licence_CeCILL-B_V1-en.txt).
 
 WISARD-CI is composed of WISARD plus a serie of enhancements and
 additionnal procedures by G. DUVERT, making WISARD conformant to the
