@@ -175,12 +175,6 @@ end
   hdunames=replicate('',next)
   hdunumbers=indgen(next)
 
-;; special case: only an "IMAGE-OI OUTPUT PARAM" section, will use it
-;; as input param as well
-  w=where(hdunames eq "IMAGE-OI INPUT PARAM", count)
-  if (count gt 0) then hdu_to_read_as_input= "IMAGE-OI INPUT PARAM" else hdu_to_read_as_input= "IMAGE-OI OUTPUT PARAM"
-  
-
 ;read first header
   hdu0=mrdfits(input,0,main_header)
 ;if image, take it as guess (however can be updated afterwards, see below)
@@ -191,7 +185,7 @@ end
 ;
 ;examine others
   for i=1,next do begin
-     if ( extname[i] EQ hdu_to_read_as_input ) then begin 
+     if ( extname[i] EQ "IMAGE-OI INPUT PARAM" ) then begin 
 ; use a special trick: mrdfits is unable to read this kind of data
 ; where TFIELDS=0. use fits_read with only headers
         fits_read,input,dummy,input_params_header,/header_only,exten_no=i
@@ -485,7 +479,7 @@ if (fov gt maxfov or fov le 0) then begin
 end 
 
 ; format some help/debug line
- commandline='Line equivalent of your command: wisardgui,display="'+strtrim(display,2)+','+input+'","'+output+'",target="'+target+'",threshold='+strtrim(string(threshold),2)+',nbiter='+strtrim(string(nbiter),2)+',fov='+strtrim(string(fov),2)+',np_min='+strtrim(string(np_min),2)+',regul="'+regul_name[regul]+'",waverange=['+strtrim(string(wave_min*1E6),2)+','+strtrim(string(wave_max*1E6),2)+']'
+ commandline='Line equivalent of your command: wisardgui,display='+strtrim(display,2)+',"'+input+'","'+output+'",target="'+target+'",threshold='+strtrim(string(threshold),2)+',nbiter='+strtrim(string(nbiter),2)+',fov='+strtrim(string(fov),2)+',np_min='+strtrim(string(np_min),2)+',regul="'+regul_name[regul]+'",waverange=['+strtrim(string(wave_min*1E6),2)+','+strtrim(string(wave_max*1E6),2)+']'
  if (doinit_img) then commandline+='",init_img="'+init_img
  if (dorgl_prio) then commandline+='",rgl_prio="'+rgl_prio+'"'
  if (doRgl_Wgt) then commandline+=',rgl_wgt='+strtrim(string(rgl_wgt),2)
@@ -579,32 +573,48 @@ end
   mwrfits,aux_output.x,output,main_header,/create,/silent,/no_copy,/no_comment
 
 ; output parameters. always present.
-  FXADDPAR,ouput_params_header,'XTENSION','BINTABLE'
-  FXADDPAR,ouput_params_header,'EXTNAME','IMAGE-OI OUTPUT PARAM'
-  FXADDPAR,ouput_params_header,'TARGET',target
-  FXADDPAR,ouput_params_header,'WAVE_MIN',wave_min
-  FXADDPAR,ouput_params_header,'WAVE_MAX',wave_max
-  FXADDPAR,ouput_params_header,'LAST_IMG',reconstructed_image_hduname
-  FXADDPAR,ouput_params_header,'MAXITER',nbiter
-  FXADDPAR,ouput_params_header,'NITER',aux_output.iter
-  FXADDPAR,ouput_params_header,'CHISQ',aux_output.crit_array[0] ; TBC
-  FXADDPAR,ouput_params_header,'FLUX',total(reconstruction) ; 1.0 . Always ^))
-  FXADDPAR,ouput_params_header,'RGL_NAME',regul_name[regul]
-  if doRgl_Wgt then FXADDPAR,ouput_params_header,'RGL_WGT',rgl_wgt
-  if doDelta then FXADDPAR,ouput_params_header,'DELTA',delta
-  FXADDPAR,ouput_params_header,'THRESHOL',threshold
-  FXADDPAR,ouput_params_header,'NP_MIN',np_min
-  FXADDPAR,ouput_params_header,'FOV',fov,'Field of View (mas)'
-  FXADDPAR,ouput_params_header,'SOFTWARE','WISARD','IR software name'
-  FXADDPAR,ouput_params_header,'VERSION',wisard_ci_version,'version of software'
+  FXADDPAR,output_params_header,'XTENSION','BINTABLE'
+  FXADDPAR,output_params_header,'EXTNAME','IMAGE-OI OUTPUT PARAM'
+  FXADDPAR,output_params_header,'TARGET',target
+  FXADDPAR,output_params_header,'WAVE_MIN',wave_min
+  FXADDPAR,output_params_header,'WAVE_MAX',wave_max
+  FXADDPAR,output_params_header,'LAST_IMG',reconstructed_image_hduname
+  FXADDPAR,output_params_header,'MAXITER',nbiter
+  FXADDPAR,output_params_header,'NITER',aux_output.iter
+  FXADDPAR,output_params_header,'CHISQ',aux_output.crit_array[0] ; TBC
+  FXADDPAR,output_params_header,'FLUX',total(reconstruction) ; 1.0 . Always ^))
+  FXADDPAR,output_params_header,'RGL_NAME',regul_name[regul]
+  if doRgl_Wgt then FXADDPAR,output_params_header,'RGL_WGT',rgl_wgt
+  if doDelta then FXADDPAR,output_params_header,'DELTA',delta
+  FXADDPAR,output_params_header,'THRESHOL',threshold
+  FXADDPAR,output_params_header,'NP_MIN',np_min
+  FXADDPAR,output_params_header,'FOV',fov,'Field of View (mas)'
+  FXADDPAR,output_params_header,'SOFTWARE','WISARD','IR software name'
+  FXADDPAR,output_params_header,'VERSION',wisard_ci_version,'version of software'
 
-  dummystruct={DUMMY: 0.0d}; we need a dummy structure to make mwrfits write a binary extension
-  mwrfits,dummystruct,output,ouput_params_header,/silent,/no_copy,/no_comment
+  mwrfits,{DUMMY:1},output,output_params_header,/silent,/no_copy,/no_comment ; !NULL makes only a header
+
+  if (n_elements(input_params_header) eq 0) then begin  ; create one by ourselves
+     FXADDPAR,input_params_header,'XTENSION','BINTABLE'
+     FXADDPAR,input_params_header,'EXTNAME','IMAGE-OI INPUT PARAM'
+     if dotarget then FXADDPAR,input_params_header,'TARGET',target
+     if dowaverange then FXADDPAR,input_params_header,'WAVE_MIN',waverange[0]
+     if dowaverange then FXADDPAR,input_params_header,'WAVE_MAX',waverange[1]
+     if donbiter then FXADDPAR,input_params_header,'MAXITER',nbiter
+     if doregul then FXADDPAR,input_params_header,'RGL_NAME',regul_name[regul]
+     if doRgl_Wgt then FXADDPAR,input_params_header,'RGL_WGT',rgl_wgt
+     if doDelta then FXADDPAR,input_params_header,'DELTA',delta
+     if dorgl_prio then FXADDPAR,input_params_header,'RGL_PRIO',rgl_prio
+     if donp_min then FXADDPAR,input_params_header,'NP_MIN',np_min
+     if dothreshold then FXADDPAR,input_params_header,'THRESHOLD',threshold
+     if dofov then FXADDPAR,input_params_header,'FOV',fov,'Field of View (mas)'
+  endif
+  
+  mwrfits,{DUMMY:1},output,input_params_header,/silent,/no_copy,/no_comment ; !NULL makes only a header
 
 ; input params only if there was an image inside. In which case we
 ; copy the initial image too, under its initial name
   if find_init_img then begin
-     mwrfits,{aaa:0.0},output,input_params_header,/silent,/no_copy,/no_comment
 
 ; reinterpret input parameters and add correct values to images headers
      
@@ -645,7 +655,6 @@ end
 ; wavelengths or wavelength subsets.
   for i=0,n_elements(oivis2arr)-1 do begin
      outhead=*oivis2headarr[i]
-
 
      doWaveSubset=0
 ; note: the doWaveSubset trick is not correctly implemented in the
