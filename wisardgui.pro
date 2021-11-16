@@ -4,7 +4,7 @@
 ; NAME: WISARDGUI
 ;
 ; PURPOSE: 
-;     fronted of wisard interferometric image reconstruction
+;     frontend of wisard interferometric image reconstruction
 ;     procedure.
 ;       
 ; CATEGORY:
@@ -12,7 +12,7 @@
 ;
 ; CALLING SEQUENCE: 
 ;     WISARDGUI,INPUT,OUTPUT,
-;     TARGET=TARGET,INTERACTIVE=INTERACTIVE,THRESHOLD=THRESHOLD,
+;     TARGET=TARGET,INTERACTIVE=INTERACTIVE,FLUXERR=FLUXERR,
 ;     GUESS=GUESS,NBITER=NBITER,FOV=FOV,NP_MIN=NP_MIN,REGUL=REGUL,
 ;     POSITIVITY=POSITIVITY,OVERSAMPLING=OVERSAMPLING,
 ;     INIT_IMG=INIT_IMG,RGL_PRIO=RGL_PRIO,DISPLAY=DISPLAY,
@@ -70,7 +70,7 @@
 ;
 ;-
 
-pro wisardgui,input,output,target=target,threshold=threshold,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,rgl_wgt=rgl_wgt,delta=delta,average=binsize,_extra=ex,help=help
+pro wisardgui,input,output,target=target,fluxerr=fluxerr,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,rgl_wgt=rgl_wgt,delta=delta,average=binsize,_extra=ex,help=help
 
 ; if /display option, we are interactive
 @ "wisard_common.pro"
@@ -96,9 +96,9 @@ end
   if wisard_is_interactive then if (!d.name ne "X" and !d.name ne "MAC" ) then display=0
   if (display) then device, decomposed=0, retain=2
 
-  ; memorize passed line values
+  ; memorize passed line values. these will always supersede what is in the input file, as the line command should permit everything.
   dotarget=n_elements(target) ne 0 
-  dothreshold=n_elements(threshold) ne 0
+  dofluxerr=n_elements(fluxerr) ne 0
   donbiter=n_elements(nbiter) ne 0
   dofov=n_elements(fov) ne 0
   donp_min=n_elements(np_min) ne 0
@@ -110,8 +110,9 @@ end
   doDelta=n_elements(delta) ne 0
   doAverage=n_elements(binsize) ne 0
 
+  ; set 'passed_xxx' to the value passed.
   if dotarget then passed_target=target 
-  if dothreshold then passed_threshold=threshold
+  if dofluxerr then passed_fluxerr=fluxerr
   if donbiter then passed_nbiter=nbiter
   if dofov then passed_fov=fov
   if donp_min then passed_np_min = np_min
@@ -153,7 +154,7 @@ end
 ;; defaults in absence of passed values. Will be updated by the ones
 ;; in the input file, which are superseded by the eventual arguments passed.
   target='*'
-  threshold=1d-3
+  fluxerr=1d-3
   nbiter=50
   fov=14.0D
   np_min=64L
@@ -182,7 +183,23 @@ end
 ; eventually, if has an HDUNAME, get it
   hduname=strtrim(sxpar(main_header,"HDUNAME"),2)
   if hduname ne '0' then hdunames[0]=hduname
-;
+; if image has coordinates, use them as FOV. This FOV can be modified only by the FOV parameter of the input params table, if any.
+  if n_elements(hdu0) gt 1 then begin
+     ; check if we can compute a FOV and a np_min
+     naxis1=sxpar(main_header,"NAXIS1")
+     ;naxis2=sxpar(main_header,"NAXIS2") ; use naxis1 only
+     if naxis1 gt 0 then np_min = naxis1 else  MESSAGE, "invalid fits header for init image: NAXIS1 0 or not defined."
+     cdelt1=abs(sxpar(main_header,"CDELT1"))
+     if abs(cdelt1) gt 1D-20 then begin
+        fov = cdelt1*naxis1
+        fov *= (3600d*1000)     ; in mas
+        np_min = naxis1
+     endif
+     cunit1=sxpar(main_header,"CUNIT1") ; cunit='deg' this is a FITS standard 
+     s = strtrim(cunit1,2)
+     if s ne '0' then if s ne 'deg' then MESSAGE, "invalid fits header for init image: coordinates must be in degrees."
+  endif
+  
 ;examine others
   for i=1,next do begin
      if ( extname[i] EQ "IMAGE-OI INPUT PARAM" ) then begin 
@@ -238,13 +255,16 @@ end
         req_np_min=sxpar(input_params_header,"NP_MIN") 
         if req_np_min gt 0 then np_min=req_np_min
 
-; THRESHOL -> threshold
-        req_threshold=sxpar(input_params_header,"THRESHOL") 
-        if req_threshold gt 0 then threshold=double(req_threshold)
+; FLUXERR -> fluxerr
+        req_fluxerr=sxpar(input_params_header,"FLUXERR") 
+        if req_fluxerr gt 0 then fluxerr=double(req_fluxerr)
 
 ; FOV
         req_fov=sxpar(input_params_header,"FOV") 
-        if req_fov gt 0 then fov=req_fov
+        if req_fov gt 0 then begin
+           fov=req_fov
+        endif
+        
         
 ; WISARD: RGL_WGT: WARNING: This is not the same logic. As RGL_WGT default
 ; is best computed from the image and NP, wee need to know if a RGL_WGT
@@ -316,6 +336,21 @@ end
      if (count ge 1) then begin 
         hdu_init_img=hdunumbers[w[0]]
         guess=mrdfits(input,hdu_init_img,init_img_header) ; TODO: use header coordinates etc.
+        ; if image has coordinates, use them as FOV. This FOV can be modified only by the FOV parameter of the input params table, if any.
+        if n_elements(hdu_init_img) gt 1 then begin
+        ; check if we can compute a FOV and a np_min
+           naxis1=sxpar(init_img_header,"NAXIS1")
+           if naxis1 gt 0 then np_min = naxis1 else  MESSAGE, "invalid fits header for init image: NAXIS1 0 or not defined."
+           cdelt1=abs(sxpar(init_img_header,"CDELT1"))
+           if abs(cdelt1) gt 1D-20 then begin
+              fov = cdelt1*naxis1
+              fov *= (3600d*1000) ; in mas
+              np_min = naxis1
+           endif
+           cunit1=sxpar(init_img_header,"CUNIT1") ; cunit='deg' this is a FITS standard 
+           s = strtrim(cunit1,2)
+           if s ne '0' then if s ne 'deg' then MESSAGE, "invalid fits header for init image: coordinates must be in degrees."
+        endif
         message,/inform,'... found init image "'+init_img+'" at HDU #'+strtrim(string(hdu_init_img),2)
      endif else find_init_img = 0
   endif
@@ -349,7 +384,7 @@ end
   endif
 
   if dorgl_prio then begin
-     find_prior_impg = 0
+     find_prior_img = 0
      ; if prior is a string, read it as fits. Else check it is a 2d array
      sz = size(passed_rgl_prio) & nsz = N_ELEMENTS(sz) & typesz = sz[nsz-2]  
      if (typesz eq 7) then begin 
@@ -365,7 +400,7 @@ end
 
 
   if dotarget    then target=passed_target
-  if dothreshold then threshold=double(passed_threshold); convergence threshold
+  if dofluxerr   then fluxerr=double(passed_fluxerr); convergence fluxerr
   if donbiter    then nbiter=fix(passed_nbiter) ; number of iterations.
   if dofov       then fov = double(passed_fov) ; Field of View of reconstructed image (14*14 marcsec^2 here)
   if donp_min    then np_min = fix(passed_np_min) ; width of reconstructed image in pixels (same along x and y axis).
@@ -479,7 +514,7 @@ if (fov gt maxfov or fov le 0) then begin
 end 
 
 ; format some help/debug line
- commandline='Line equivalent of your command: wisardgui,display='+strtrim(display,2)+',"'+input+'","'+output+'",target="'+target+'",threshold='+strtrim(string(threshold),2)+',nbiter='+strtrim(string(nbiter),2)+',fov='+strtrim(string(fov),2)+',np_min='+strtrim(string(np_min),2)+',regul="'+regul_name[regul]+'",waverange=['+strtrim(string(wave_min*1E6),2)+','+strtrim(string(wave_max*1E6),2)+']'
+ commandline='Line equivalent of your command: wisardgui,display='+strtrim(display,2)+',"'+input+'","'+output+'",target="'+target+'",fluxerr='+strtrim(string(fluxerr),2)+',nbiter='+strtrim(string(nbiter),2)+',fov='+strtrim(string(fov),2)+',np_min='+strtrim(string(np_min),2)+',regul="'+regul_name[regul]+'",waverange=['+strtrim(string(wave_min*1E6),2)+','+strtrim(string(wave_max*1E6),2)+']'
  if (doinit_img) then commandline+='",init_img="'+init_img
  if (dorgl_prio) then commandline+='",rgl_prio="'+rgl_prio+'"'
  if (doRgl_Wgt) then commandline+=',rgl_wgt='+strtrim(string(rgl_wgt),2)
@@ -512,13 +547,13 @@ end
      0: begin ; L1L2
         if (~doRgl_Wgt) then rgl_wgt = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         if (~doDelta) then delta = 1D
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=rgl_wgt, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=fluxerr, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=rgl_wgt, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
 
      1: begin ; L1L2WHITE
         if (~doRgl_Wgt) then rgl_wgt = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         if (~doDelta) then delta = 1D
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=rgl_wgt, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=fluxerr, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=rgl_wgt, DELTA=delta, /WHITE, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
 
      2: begin ; PSD
@@ -529,19 +564,19 @@ end
            distance = double(shift(dist(np_min),np_min/2,np_min/2))
            psd = 1D/((distance^3 > 1D) < 1D6)
         endelse
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=fluxerr, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, PSD=psd, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
 
      3: begin ; SOFT_SUPPORT
         if ~n_elements(fwhm) then fwhm=10                  ; pixels
         if ~n_elements(mu_support) then mu_support=10.0    ; why not?
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=fluxerr, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, MEAN_O=prior, MU_SUPPORT = mu_support, FWHM = fwhm, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
 
      4: begin ; TOTVAR
         if (~doRgl_Wgt) then rgl_wgt = 1D/(NP_min)^2   ; factor for balance between regularization **** and in cost function
         delta = rgl_wgt/1D9 ; TOTVAR is L1L2 with delta infinitesimal.
-        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=threshold, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=rgl_wgt, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
+        reconstruction = WISARD(masterDataArray, NBITER = nbiter, threshold=fluxerr, GUESS = guess, FOV = fov*onemas, NP_MIN = np_min, SCALE=rgl_wgt, DELTA=delta, AUX_OUTPUT = aux_output, oversampling=oversampling, positivity=positivity, display=display, USE_FLAGGED_DATA=use_flagged_data, simulated_data=issim, /CHI2CRIT, _extra=ex)
      end
      
      else: message,"ERROR: regularization not yet supported, FIXME!"
@@ -586,7 +621,7 @@ end
   FXADDPAR,output_params_header,'RGL_NAME',regul_name[regul]
   if doRgl_Wgt then FXADDPAR,output_params_header,'RGL_WGT',rgl_wgt
   if doDelta then FXADDPAR,output_params_header,'DELTA',delta
-  FXADDPAR,output_params_header,'THRESHOL',threshold
+  FXADDPAR,output_params_header,'FLUXERR',fluxerr
   FXADDPAR,output_params_header,'NP_MIN',np_min
   FXADDPAR,output_params_header,'FOV',fov,'Field of View (mas)'
   FXADDPAR,output_params_header,'SOFTWARE','WISARD','IR software name'
@@ -606,7 +641,7 @@ end
      if doDelta then FXADDPAR,input_params_header,'DELTA',delta
      if dorgl_prio then FXADDPAR,input_params_header,'RGL_PRIO',rgl_prio
      if donp_min then FXADDPAR,input_params_header,'NP_MIN',np_min
-     if dothreshold then FXADDPAR,input_params_header,'THRESHOLD',threshold
+     if dofluxerr then FXADDPAR,input_params_header,'FLUXERR',fluxerr
      if dofov then FXADDPAR,input_params_header,'FOV',fov,'Field of View (mas)'
   endif
   
@@ -642,6 +677,9 @@ end
 
   mwrfits,oitarget,output,targethead,/silent,/no_copy,/no_comment
 
+; write back rgl_prio
+  if find_prior_img then mwrfits,prior,output,prior_img_header,/silent,/no_copy,/no_comment
+  
 ; a good program would only write results related to current target! TODO!
   for i=0,n_elements(oiarrayarr)-1 do mwrfits,*(oiarrayarr[i]),output,*(oiarrayheadarr[i]),/silent,/no_copy,/no_comment
 
