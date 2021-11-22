@@ -263,6 +263,8 @@ pro model2oifits,input,model,output,target=target
         oitarget = mrdfits(input,i,targethead)
      endif else if extname[i] eq  "IMAGE-OI INPUT PARAM" then begin ; only one input param.
         inputparam = mrdfits(input,i,inputparamhead)
+     endif else if extname[i] eq  "IMAGE-OI OUTPUT PARAM" then begin ; only one output param.
+        outputparam = mrdfits(input,i,outputparamhead)
      endif else begin           ; every other tables: may contain an hduname image
         oiother = ptr_new( mrdfits(input,i,header) )
         ; eventually, if has an HDUNAME, get it
@@ -323,6 +325,8 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
   endfor
 ; if no "model", trouble:
   if (n_elements(mvis) lt 1) then message,"Wrong model file, exiting"
+
+;LBO: dead code ?
 
 ; prepare output HDU
   FXADDPAR,outhead,'XTENSION','BINTABLE'

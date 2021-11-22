@@ -224,7 +224,7 @@ end
 
 ; INIT_IMG
         req_init_img=strtrim(sxpar(input_params_header,"INIT_IMG"),2) ; avoid problems with blanks.
-        if req_init_img ne '0' then begin
+        if req_init_img ne '0' and strlen(strtrim(req_init_img,2)) gt 0 then begin ; protect against null names sent by OImaging...
            init_img=req_init_img ; it is the name of a HDUNAME.
            find_init_img = 1 ; will force to find it
            message,/inform,"... OIMaging file requests "+init_img+" as init image"
@@ -245,7 +245,7 @@ end
 
 ; RGL_PRIO
         req_rgl_prio=strtrim(sxpar(input_params_header,"RGL_PRIO"),2) ; avoid problems with blanks.
-        if req_rgl_prio ne '0' then begin
+        if req_rgl_prio ne '0' and strlen(strtrim(req_rgl_prio,2)) gt 0  then begin ; protect against null names sent by OImaging...
            rgl_prio=req_rgl_prio ; it is the name of a HDUNAME.
            find_prior_img=1
            message,/inform,"... OIMaging file requests "+rgl_prio+" as regularization prior"
@@ -398,6 +398,8 @@ end
      endelse
   endif
 
+  ; if prior is finally set to somthing, use it , so regul IS PSD
+  if n_elements(prior) gt 1 then regul=2 
 
   if dotarget    then target=passed_target
   if dofluxerr   then fluxerr=double(passed_fluxerr); convergence fluxerr
