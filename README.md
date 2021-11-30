@@ -1,41 +1,37 @@
 WISARD-CI: the simplified interface to WISARD.
+==============================================
 
-WISARD (http://www.mariotti.fr/doc/approved/JMMC-MAN-2500-0001.pdf and
-references inside) is a monochromatic image reconstruction program
+[WISARD](http://www.mariotti.fr/doc/approved/JMMC-MAN-2500-0001.pdf) is a monochromatic image reconstruction program
 developed for JMMC by S. Meimon and L. Mugnier, available under the
 CeCILL-B license (see LICENSE and See Licence_CeCILL-B_V1-en.txt).
 
 WISARD-CI is composed of WISARD plus a serie of enhancements and
 additionnal procedures by G. DUVERT, making WISARD conformant to the
-Optical Imaging interface requirements
-(https://github.com/emmt/OI-Imaging-JRA/raw/master/doc/interface/OI-Interface.pdf),
-to the OI-FITS format, and to the OImaging GUI available at
-http://www.mariotti.fr/oimaging.htm
+[Optical Imaging interface requirements](https://github.com/emmt/OI-Imaging-JRA/raw/master/doc/interface/OI-Interface.pdf),
+to the [OI-FITS format](https://arxiv.org/abs/1510.04556), and to the [OImaging GUI](https://www.jmmc.fr/english/tools/data-analysis/oimaging/) available at
+[](https://www.jmmc.fr/english/tools/data-analysis/oimaging/)
 
 WISARD-CI installation: 
-------------------------------
+-----------------------
 
-- get the SVN repository files
-- put bin/wisard-ci in the PATH:
-  > PATH=$PATH:/where/is/wisard-ci; export PATH 
- or make a soft link from a $PATH directory to it: 
-  > ln -s /where/is/wisard-ci ~/bin
-  (provided ~/bin exist and is in the PATH of course)
+1. get the SVN repository files
+2. put bin/wisard-ci in the PATH:
+      > PATH=$PATH:/where/is/wisard-ci; export PATH 
+3. or make a soft link from a $PATH directory to it: 
+      > ln -s /where/is/wisard-ci ~/bin
+   (provided ~/bin exist and is in the PATH of course)
 
-- if you have IDL, you are rich. And you do not have to follow the
-  instructions below. Go to "USAGE".
+- if you have IDL, you are rich. And you do not have to follow the instructions below. Go to "USAGE".
 
-- Now the hard part:
+- if you do not have IDL, you are probably smart and have installed GDL instead.
 
   - install GDL, the free IDL clone, available as 'gnudatalanguage' in
   your ditribution (MacOS: "brew tap Homebrew/homebrew-science" and
   "brew install gnudatalanguage" for example; look for
   "gnudatalanguage" in debian, ubuntu etc.)
 
-  --> eventually, get the source distribution on SF:
-  https://sourceforge.net/projects/gnudatalanguage and follow
-  compilation instructions. Prefer recent versions. Old versions of
-  GDL (before 0.9.6) will be SLOW.
+  - eventually, [get the source distribution of GDL](https://github.com/gnudatalanguage/gdl) and follow
+  compilation instructions.
 
 USAGE:
 -------
