@@ -261,10 +261,10 @@ pro model2oifits,input,model,output,target=target
         oiwaveheadarr = (n_elements(oiwaveheadarr) gt 0)?[oiwaveheadarr,oiwavehead]:oiwavehead
      endif else if extname[i] eq  "OI_TARGET" then begin ; only one target.
         oitarget = mrdfits(input,i,targethead)
-     endif else if extname[i] eq  "IMAGE-OI INPUT PARAM" then begin ; only one input param.
-        inputparam = mrdfits(input,i,inputparamhead)
-     endif else if extname[i] eq  "IMAGE-OI OUTPUT PARAM" then begin ; only one output param.
-        outputparam = mrdfits(input,i,outputparamhead)
+     ;; endif else if extname[i] eq  "IMAGE-OI INPUT PARAM" then begin ; only one input param.
+     ;;    inputparam = mrdfits(input,i,inputparamhead)
+     ;; endif else if extname[i] eq  "IMAGE-OI OUTPUT PARAM" then begin ; only one output param.
+     ;;    outputparam = mrdfits(input,i,outputparamhead)
      endif else begin           ; every other tables: may contain an hduname image
         oiother = ptr_new( mrdfits(input,i,header) )
         ; eventually, if has an HDUNAME, get it
@@ -317,33 +317,18 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
 
 ;read first header
   image=mrdfits(model,0,model_main_header)
-;examine others
+;examine others, get visibilities and input/output params.
   for i=1,mext do begin
      if( m_extname[i] eq "IMAGE-OI MODEL VISIBILITIES" or  m_extname[i] eq "MODEL-VISIBILITIES" ) then begin ; found in some old version of mira
         mvis=mrdfits(model,i,m_header)
-     endif
+     endif else if m_extname[i] eq  "IMAGE-OI INPUT PARAM" then begin ; only one input param.
+        inputparam = mrdfits(input,i,inputparamhead)
+     endif else if m_extname[i] eq  "IMAGE-OI OUTPUT PARAM" then begin ; only one output param.
+        outputparam = mrdfits(input,i,outputparamhead)
   endfor
 ; if no "model", trouble:
   if (n_elements(mvis) lt 1) then message,"Wrong model file, exiting"
 
-;LBO: dead code ?
-
-; prepare output HDU
-  FXADDPAR,outhead,'XTENSION','BINTABLE'
-  FXADDPAR,outhead,'EXTNAME','IMAGE-OI INPUT PARAM'
-  FXADDPAR,outhead,'TARGET',target
-;  FXADDPAR,outhead,'USE_VIS', 'T'
-;  FXADDPAR,outhead,'USE_VIS2','T'
-;  FXADDPAR,outhead,'USE_T3', 'T'
-  if (n_elements(init_img) gt 0) then FXADDPAR,outhead,'INIT_IMG',init_img ; the init image file passed
-;  FXADDPAR,outhead,'MAXITER',nbiter
-;  FXADDPAR,outhead,'RGL_NAME',regul_name[regul]
-;  if (n_elements(scale) gt 0 ) then FXADDPAR,outhead,'SCALE',scale
-;  if (n_elements(delta) gt 0 ) then FXADDPAR,outhead,'DELTA',delta
-;  FXADDPAR,outhead,'THRESHOL',threshold
-;  FXADDPAR,outhead,'NP_MIN',np_min
-;  FXADDPAR,outhead,'OVERSAMP',oversampling
-;  FXADDPAR,outhead,'FOV',fov,'Field of View (mas)'
 
 ; write output file. Put output image in main header!
 ;main header: the reconstructed image. Just a copy of main header of 'model':
@@ -359,8 +344,9 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
 
 ; do not write unknown arrays.
 ;  for i=0,n_elements(oiotherarr)-1 do mwrfits,*(oiotherarr[i]),output,*(oiotherheadarr[i]),/silent,/no_copy,/no_comment
-; but write input params (header) . trick is that we NEED to pass a structure.
-  if (n_elements(inputparam)) then mwrfits,{aaa:0.0},output,inputparamhead,/silent,/no_copy,/no_comment
+; but write params (header) . trick is that we NEED to pass a structure.
+  if (n_elements(inputparam)) then mwrfits,{dummyin:0.0},output,inputparamhead,/silent,/no_copy,/no_comment
+  if (n_elements(outputparam)) then mwrfits,{dummyout:0.0},output,outputparamhead,/silent,/no_copy,/no_comment
 
   goodinsnamelist=''
 ; write structures updated with computed values: select only sections
