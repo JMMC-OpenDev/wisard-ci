@@ -543,6 +543,10 @@ end
 ; finally flatten (default)
   wisard_flatten_data,masterDataArray
 
+; ******************PATCH*******************
+; set FLUXERR to something sensible
+  fluxerr=1d-6
+  
 ; TOTVAR is just delta=very_small. 
   case regul of
 
