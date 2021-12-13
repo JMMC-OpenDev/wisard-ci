@@ -261,10 +261,6 @@ pro model2oifits,input,model,output,target=target
         oiwaveheadarr = (n_elements(oiwaveheadarr) gt 0)?[oiwaveheadarr,oiwavehead]:oiwavehead
      endif else if extname[i] eq  "OI_TARGET" then begin ; only one target.
         oitarget = mrdfits(input,i,targethead)
-     ;; endif else if extname[i] eq  "IMAGE-OI INPUT PARAM" then begin ; only one input param.
-     ;;    inputparam = mrdfits(input,i,inputparamhead)
-     ;; endif else if extname[i] eq  "IMAGE-OI OUTPUT PARAM" then begin ; only one output param.
-     ;;    outputparam = mrdfits(input,i,outputparamhead)
      endif else begin           ; every other tables: may contain an hduname image
         oiother = ptr_new( mrdfits(input,i,header) )
         ; eventually, if has an HDUNAME, get it
@@ -319,12 +315,14 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
   image=mrdfits(model,0,model_main_header)
 ;examine others, get visibilities and input/output params.
   for i=1,mext do begin
-     if( m_extname[i] eq "IMAGE-OI MODEL VISIBILITIES" or  m_extname[i] eq "MODEL-VISIBILITIES" ) then begin ; found in some old version of mira
-        mvis=mrdfits(model,i,m_header)
-     endif else if m_extname[i] eq  "IMAGE-OI INPUT PARAM" then begin ; only one input param.
-        inputparam = mrdfits(input,i,inputparamhead)
-     endif else if m_extname[i] eq  "IMAGE-OI OUTPUT PARAM" then begin ; only one output param.
-        outputparam = mrdfits(input,i,outputparamhead)
+     ;print,"Model HDU: ",i, " extname: ",m_extname[i]
+     if (m_extname[i] eq "IMAGE-OI MODEL VISIBILITIES" or m_extname[i] eq "MODEL-VISIBILITIES") then begin ; found in some old version of mira
+        mvis = mrdfits(model,i,m_header)
+     endif else if (m_extname[i] eq  "IMAGE-OI INPUT PARAM") then begin ; only one input param.
+        inputparam = mrdfits(model,i,inputparamhead)
+     endif else if (m_extname[i] eq  "IMAGE-OI OUTPUT PARAM") then begin ; only one output param.
+        outputparam = mrdfits(model,i,outputparamhead)
+     endif
   endfor
 ; if no "model", trouble:
   if (n_elements(mvis) lt 1) then message,"Wrong model file, exiting"
@@ -337,6 +335,10 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
   ny=sz[2]
   mwrfits,image,output,model_main_header,/create,/silent,/no_copy,/no_comment
 
+; write params (header). trick is that we NEED to pass a structure.
+  if (n_elements(inputparam)) then mwrfits,{dummyin:0.0},output,inputparamhead,/silent,/no_copy,/no_comment
+  if (n_elements(outputparam)) then mwrfits,{dummyout:0.0},output,outputparamhead,/silent,/no_copy,/no_comment
+
   mwrfits,oitarget,output,targethead,/silent,/no_copy,/no_comment
 
 ; a good program would only write results related to current target! TODO!
@@ -344,9 +346,6 @@ if (n_elements(oitarget) gt 1) then message,/informational,"WARNING -- Output fi
 
 ; do not write unknown arrays.
 ;  for i=0,n_elements(oiotherarr)-1 do mwrfits,*(oiotherarr[i]),output,*(oiotherheadarr[i]),/silent,/no_copy,/no_comment
-; but write params (header) . trick is that we NEED to pass a structure.
-  if (n_elements(inputparam)) then mwrfits,{dummyin:0.0},output,inputparamhead,/silent,/no_copy,/no_comment
-  if (n_elements(outputparam)) then mwrfits,{dummyout:0.0},output,outputparamhead,/silent,/no_copy,/no_comment
 
   goodinsnamelist=''
 ; write structures updated with computed values: select only sections
