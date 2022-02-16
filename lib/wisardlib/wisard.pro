@@ -872,7 +872,8 @@ FUNCTION WISARD, masterDataArray,  $
   
   ENDWHILE
 
-
+;; converged ?
+  converged=(conv le epsilon) 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; POST-PROCESSING
@@ -911,7 +912,7 @@ FUNCTION WISARD, masterDataArray,  $
                                               x:norm_x, alpha:alpha, $
                                                operators:operators, weights_constant:weights_constant, $
                                                weights_alpha:weights_alpha, weights_x:weights_x, $
-                                               rad_freqs:rad_freqs}
+                                               rad_freqs:rad_freqs, converged:converged}
   
   return, norm_x
 END
