@@ -71,7 +71,8 @@
 ;-
 
 pro wisardgui,input,output,target=target,fluxerr=fluxerr,nbiter=nbiter,fov=fov,np_min=np_min,regul=regul,positivity=positivity,oversampling=oversampling,init_img=passed_init_img,rgl_prio=rgl_prio,display=display,mu_support=mu_support, fwhm=fwhm, waverange=waverange, simulated_data=issim, use_flagged_data=use_flagged_data,reconstructed_img=reconstructed_img,scale=scale,rgl_wgt=rgl_wgt,delta=delta,average=binsize,_extra=ex,help=help
-
+  !QUIET=1
+  print,"WISARD OUTPUT STARTS HERE"
 ; if /display option, we are interactive
 @ "wisard_common.pro"
 
@@ -164,7 +165,7 @@ end
   guess = 0
   init_img = ''
   prior = 0
-  find_init_img = 0
+  has_init_img_in_file = 0
   find_prior_img = 0
 
 ;; First read input file and get start image & parameters that overread defaults.
@@ -226,7 +227,7 @@ end
         req_init_img=strtrim(sxpar(input_params_header,"INIT_IMG"),2) ; avoid problems with blanks.
         if req_init_img ne '0' and strlen(strtrim(req_init_img,2)) gt 0 then begin ; protect against null names sent by OImaging...
            init_img=req_init_img ; it is the name of a HDUNAME.
-           find_init_img = 1 ; will force to find it
+           has_init_img_in_file = 1 ; will force to find it
            message,/inform,"... OIMaging file requests "+init_img+" as init image"
         endif
 
@@ -330,7 +331,7 @@ end
 
 ; if init_img is defined in header, then find this hdu, read image and
 ; use it as guess. remember HDU as we  will copy it.
-  if find_init_img then begin
+  if has_init_img_in_file then begin
      w=where(hdunames eq init_img, count)
      if (count gt 1) then print, 'multiple init images found in input file, discarding all but first one.'
      if (count ge 1) then begin 
@@ -352,7 +353,9 @@ end
            if s ne '0' then if s ne 'deg' then MESSAGE, "invalid fits header for init image: coordinates must be in degrees."
         endif
         message,/inform,'... found init image "'+init_img+'" at HDU #'+strtrim(string(hdu_init_img),2)
-     endif else find_init_img = 0
+        ;save image not as guess (that may be changed by Wisard afterwards) but to an untouchable array
+        save_init_image=guess
+     endif else has_init_img_in_file = 0
   endif
 
 ; if rgl_prio is defined in header, then find this hdu, read image and use it as guess
@@ -369,7 +372,7 @@ end
 ;; input file read complete. Overwrite values with passed values if any:
 
   if doinit_img then begin
-     find_init_img = 0 ; since it's going to be replaced
+     has_init_img_in_file = 0 ; since it's going to be replaced
      ; if passed_init_img is a string, read it as fits. Else check it is a 2d array
      sz = size(passed_init_img) & nsz = N_ELEMENTS(sz) & typesz = sz[nsz-2]  
      if (typesz eq 7) then begin 
@@ -631,6 +634,7 @@ end
   FXADDPAR,output_params_header,'NP_MIN',np_min
   FXADDPAR,output_params_header,'FOV',fov,'Field of View (mas)'
   FXADDPAR,output_params_header,'SOFTWARE','WISARD','IR software name'
+  FXADDPAR,output_params_header,'CONVERGE',aux_output.converged,'convergence reached?'
   FXADDPAR,output_params_header,'VERSION',wisard_ci_version,'version of software'
 
   mwrfits,{DUMMY:1},output,output_params_header,/silent,/no_copy,/no_comment ; !NULL makes only a header
@@ -655,30 +659,11 @@ end
 
 ; input params only if there was an image inside. In which case we
 ; copy the initial image too, under its initial name
-  if find_init_img then begin
-
-; reinterpret input parameters and add correct values to images headers
-     
-     sz=size(aux_output.guess)
-     nx=sz[1]
-     ny=sz[2]
-     FXADDPAR,init_image_header,'EXTNAME','INITIAL_IMAGE'
-     FXADDPAR,init_image_header,'HDUNAME',init_img
-     FXADDPAR,init_image_header,'CTYPE1','RA---TAN'
-     FXADDPAR,init_image_header,'CTYPE2','DEC--TAN'
-     FXADDPAR,init_image_header,'CRPIX1',nx/2
-     FXADDPAR,init_image_header,'CRPIX2',ny/2
-     FXADDPAR,init_image_header,'CROTA1',0.0
-     FXADDPAR,init_image_header,'CROTA2',0.0
-     FXADDPAR,init_image_header,'CRVAL1',raep0
-     FXADDPAR,init_image_header,'CRVAL2',decep0
-     FXADDPAR,init_image_header,'CDELT1',fov/3600./1000D/nx
-     FXADDPAR,init_image_header,'CDELT2',fov/3600./1000D/ny
-     FXADDPAR,init_image_header,'CUNIT1','deg'
-     FXADDPAR,init_image_header,'CUNIT2','deg'
-     FXADDPAR,init_image_header,'EQUINOX',2000.0
-     mwrfits,aux_output.guess,output,init_image_header,/silent,/no_copy,/no_comment
-
+  if has_init_img_in_file then begin
+; issue #13 : "Software shouldn't change their inputs"
+; reinterpret input parameters and add correct values to images
+; Just copy back 
+     mwrfits,save_init_image,output,init_image_header,/silent,/no_copy,/no_comment
   endif
 
   mwrfits,oitarget,output,targethead,/silent,/no_copy,/no_comment
