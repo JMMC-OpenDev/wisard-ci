@@ -155,7 +155,7 @@ end
 ;; defaults in absence of passed values. Will be updated by the ones
 ;; in the input file, which are superseded by the eventual arguments passed.
   target='*'
-  fluxerr=1d-3
+  fluxerr=1d-6
   nbiter=50
   fov=14.0D
   np_min=64L
@@ -546,10 +546,6 @@ end
 ; finally flatten (default)
   wisard_flatten_data,masterDataArray
 
-; ******************PATCH*******************
-; set FLUXERR to something sensible
-  fluxerr=1d-6
-  
 ; TOTVAR is just delta=very_small. 
   case regul of
 
