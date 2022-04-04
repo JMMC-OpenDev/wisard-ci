@@ -630,9 +630,10 @@ end
   FXADDPAR,output_params_header,'NP_MIN',np_min
   FXADDPAR,output_params_header,'FOV',fov,'Field of View (mas)'
   FXADDPAR,output_params_header,'SOFTWARE','WISARD','IR software name'
+  ; 04/04/22 changed to PROCSOFT
+  FXADDPAR,output_params_header,'PROCSOFT',wisard_ci_version,'version of software'
   if aux_output.converged eq 0 then c='false' else c='true'
   FXADDPAR,output_params_header,'CONVERGE',c,'convergence reached?'
-  FXADDPAR,output_params_header,'VERSION',wisard_ci_version,'version of software'
 
   mwrfits,{DUMMY:1},output,output_params_header,/silent,/no_copy,/no_comment ; !NULL makes only a header
 
