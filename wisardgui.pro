@@ -661,7 +661,15 @@ end
 ; issue #13 : "Software shouldn't change their inputs"
 ; reinterpret input parameters and add correct values to images
 ; Just copy back 
-     mwrfits,save_init_image,output,init_image_header,/silent,/no_copy,/no_comment
+     ; remove wrong parameters
+     sxdelpar, init_img_header, ['SIMPLE','EXTEND']
+     ; remove wrongly placed parameters
+     sxdelpar, init_img_header, ['PCOUNT','GCOUNT']
+     ; put them back at the correct place
+     sxaddpar, init_img_header, 'PCOUNT',0,'required keyword; must = 0',AFTER='NAXIS2'
+     sxaddpar, init_img_header, 'GCOUNT',1,'required keyword; must = 1',AFTER='PCOUNT'
+     ; write init image with corrected init header
+     mwrfits,save_init_image,output,init_img_header,/silent,/no_copy,/no_comment
   endif
 
   mwrfits,oitarget,output,targethead,/silent,/no_copy,/no_comment
